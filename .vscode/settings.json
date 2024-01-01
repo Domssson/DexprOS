@@ -1,5 +1,9 @@
 {
     "cmake.configureArgs": [
         "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/cross-compile-toolchains/x86_64-w64-mingw32-generic.cmake"
-    ]
+    ],
+    "files.associations": {
+        "gdtsetup.h": "c",
+        "cpuid.h": "c"
+    }
 }

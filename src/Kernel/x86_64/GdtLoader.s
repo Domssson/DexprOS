@@ -2,16 +2,14 @@
     .global DexprOS_LoadGDT
 
 DexprOS_LoadGDT:
-    /* Push the size and offset on the stack from the first 2 function arguments */
-    pushq %rdx
-    pushw %cx
+    /* Move the address of GDTRValue to rax */
+    lea GDTRValue(%rip), %rax
+    /* Move size and address from the first 2 arguments to GDTRValue */
+    movw %cx, (%rax)
+    movq %rdx, 2(%rax)
 
-    /* Load the 10-bit GDT address variable from the stack to GDTR */
-    lgdt (%rsp)
-
-    /* Pop the previously reserved 10 bits from the stack */
-    popw %cx
-    popq %rdx
+    /* Load the 10-bit GDT size and address to GDTR */
+    lgdt (%rax)
 
     /* Load the Task State Segment specified by the 5th argument */
     mov 40(%rsp), %ax
@@ -45,4 +43,11 @@ DexprOS_LoadGDT:
 .load_gdt_flushed_section:
     /* Now simply return to the caller */
     ret
+
+
+.bss
+
+    .balign 16
+GDTRValue:
+    .skip 10, 0
 

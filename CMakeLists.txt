@@ -12,11 +12,16 @@ message(NOTICE "Notice: The only supported compiler to build DexprOS is MinGW fo
 
 
 set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
+                            src/Boot/x86_64-efi/InitialPageMapSetup.c
+                            src/Boot/x86_64-efi/InitialPageMapSwitch.s
                             src/Kernel/BuiltInBitmapFont.c
                             src/Kernel/ErrorDisplay.c
                             src/Kernel/KernelPanic.c
                             src/Kernel/KeyboardInput.c
                             src/Kernel/x86_64/InlineAsm.c
+                            src/Kernel/x86_64/CpuidRetrieve.s
+                            src/Kernel/x86_64/CpuFeatures.c
+                            src/Kernel/x86_64/FloatingPointInit.s
                             src/Kernel/x86_64/KernelPanicHalt.s
                             src/Kernel/x86_64/TaskStateSegment.c
                             src/Kernel/x86_64/GdtCreator.c
@@ -26,6 +31,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/InterruptHandlers.c
                             src/Kernel/x86_64/IdtCreator.c
                             src/Kernel/x86_64/SyscallHandler.s
+                            src/Kernel/x86_64/PageMapSwitching.s
                             src/Drivers/Graphics/GraphicsDriver.c
                             src/Drivers/Graphics/CpuGraphicsDriver.c
                             src/Drivers/PICDriver.c
@@ -36,11 +42,16 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Shell.c)
 
 set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
+                           include/DexprOS/Boot/x86_64-efi/InitialPageMapSetup.h
+                           include/DexprOS/Boot/x86_64-efi/InitialPageMapSwitch.h
                            include/DexprOS/Kernel/BuiltInBitmapFont.h
                            include/DexprOS/Kernel/ErrorDisplay.h
                            include/DexprOS/Kernel/KernelPanic.h
                            include/DexprOS/Kernel/KeyboardInput.h
                            include/DexprOS/Kernel/x86_64/InlineAsm.h
+                           include/DexprOS/Kernel/x86_64/CpuidRetrieve.h
+                           include/DexprOS/Kernel/x86_64/CpuFeatures.h
+                           include/DexprOS/Kernel/x86_64/FloatingPointInit.h
                            include/DexprOS/Kernel/x86_64/GdtCreator.h
                            include/DexprOS/Kernel/x86_64/GdtLoader.h
                            include/DexprOS/Kernel/x86_64/GdtSetup.h
@@ -50,6 +61,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/x86_64/KernelPanicHalt.h
                            include/DexprOS/Kernel/x86_64/SyscallHandler.h
                            include/DexprOS/Kernel/x86_64/TaskStateSegment.h
+                           include/DexprOS/Kernel/x86_64/PageMapSwitching.h
                            include/DexprOS/Drivers/Graphics/GraphicsDriver.h
                            include/DexprOS/Drivers/Graphics/CpuGraphicsDriver.h
                            include/DexprOS/Drivers/PICDriver.h

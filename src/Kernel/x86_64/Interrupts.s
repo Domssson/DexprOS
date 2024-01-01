@@ -59,16 +59,13 @@ DexprOS_EnableInterrupts:
 
 
 DexprOS_LoadIDT:
-    /* Push the two first arguments on to the stack to form an 10-byte IDTR value */
-    pushq %rdx
-    pushw %cx
+    /* Move the first 2 arguments to the 10-bit IDTRValue section */
+    lea IDTRValue(%rip), %rax
+    movw %cx, (%rax)
+    movq %rdx, 2(%rax)
 
     /* Load the value to Interrupt Descriptor Table Register */
-    lidt (%rsp)
-    
-    /* Pop unnecessary variables from the stack */
-    popw %cx
-    popq %rdx
+    lidt (%rax)
 
     ret
 
@@ -959,4 +956,11 @@ DexprOS_ISR_ISA_SecondaryATAHardDisk:
     popq %rcx
     popq %rax
     iretq
+
+
+
+.bss
+    .balign 16
+IDTRValue:
+    .skip 10, 0
 

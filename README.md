@@ -9,6 +9,7 @@ A simple operating system for x86-64 UEFI machines written in C and assembly. Ma
 For now, DexprOS is able to:
 - setup graphics using UEFI Graphics Output Protocol,
 - exit UEFI boot services,
+- set up its own 4-level or 5-level page map,
 - load a working General Descriptor Table and Interrupt Descriptor Table,
 - setup PIC (Programmable Interrupt Controller) and PS/2 controller,
 - handle keyboard input and convert it to unicode characters,
@@ -18,7 +19,7 @@ For now, DexprOS is able to:
 
 As DexprOS is just an experiment and my focus goes mainly to other projects, new features may be introduced slowly over time.  
 Here are my upcoming plans:
-- Paging (UEFI leaves us with a fully working paging setup, but you need your own one to be able to go to userspace and allocate memory yourself),
+- memory allocation,
 - syscalls,
 - userspace code execution,
 - parsing some ACPI structures.

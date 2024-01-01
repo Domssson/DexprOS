@@ -576,7 +576,7 @@ static void DexprOS_ShellClear(DexprOS_Shell* pShell, const DexprOS_Shell_Char* 
 
 static void DexprOS_ShellHelp(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength)
 {
-    DexprOS_ShellPuts(pShell, "DexprOS version: pre-release 0.1.0\n"
+    DexprOS_ShellPuts(pShell, "DexprOS version: pre-release 0.1.2\n"
                               "User help menu:\n\n"
                               "After typing a command and its space-separated arguments (if any), hit Enter to execute.\n"
                               "Lines starting with '#' are comments and are not interpreted as commands.\n"
