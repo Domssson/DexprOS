@@ -1,6 +1,5 @@
 .text
     .global DexprOS_Is5LevelPagingActive
-    .global DexprOS_GetCurrentPageMapPhysicalAddress
 
 
 DexprOS_Is5LevelPagingActive:

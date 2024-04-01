@@ -45,8 +45,6 @@
     .global DexprOS_ISR_ISA_PrimaryATAHardDisk
     .global DexprOS_ISR_ISA_SecondaryATAHardDisk
 
-    .global DexprOS_ISR_SystemCall
-
 
 DexprOS_DisableInterrupts:
     cli
