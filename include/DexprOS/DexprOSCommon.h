@@ -17,7 +17,7 @@
 #endif
 
 #ifndef DEXPROS_ALIGNAS
-#   if defined(__GNUC__)
+#   if defined(__GNUC__) || defined(__clang__)
 #       define DEXPROS_ALIGNAS(x) __attribute__((aligned(x)))
 #   else
 #       error Compiling under unsupported compiler

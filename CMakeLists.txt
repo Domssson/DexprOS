@@ -76,8 +76,10 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
 
 add_executable(BOOTX64.EFI ${DEXPROS_KERNEL_SOURCES} ${DEXPROS_KERNEL_HEADERS})
 
-target_compile_options(BOOTX64.EFI PRIVATE -ffreestanding)
+
+target_compile_options(BOOTX64.EFI PRIVATE -ffreestanding -mno-red-zone -fshort-wchar -fno-stack-protector)
 target_link_options(BOOTX64.EFI PRIVATE -nostdlib -shared -Wl,-dll -Wl,--subsystem,10 -e efi_main)
+
 
 target_compile_options(BOOTX64.EFI PRIVATE -Wall -Wextra -Wpedantic)
 

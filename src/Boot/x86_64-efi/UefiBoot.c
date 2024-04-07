@@ -23,7 +23,7 @@
 #include <stdbool.h>
 
 
-inline static int DexprOS_CompareUEFIGUID(const EFI_GUID* pGuid0,
+/*inline static int DexprOS_CompareUEFIGUID(const EFI_GUID* pGuid0,
                                           const EFI_GUID* pGuid1)
 {
     return pGuid0->Data1 == pGuid1->Data1 &&
@@ -37,7 +37,7 @@ inline static int DexprOS_CompareUEFIGUID(const EFI_GUID* pGuid0,
            pGuid0->Data4[5] == pGuid1->Data4[5] &&
            pGuid0->Data4[6] == pGuid1->Data4[6] &&
            pGuid0->Data4[7] == pGuid1->Data4[7];
-}
+}*/
 
 
 static EFI_STATUS DexprOSBoot_GetMemoryMap(EFI_SYSTEM_TABLE* pSystemTable,

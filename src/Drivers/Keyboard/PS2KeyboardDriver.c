@@ -390,7 +390,7 @@ static void SwitchPS2KCapsLock(void)
     }
 }
 
-static void SwitchPS2KNumLock()
+static void SwitchPS2KNumLock(void)
 {
     const DexprOS_KeyState state = g_PS2KeyboardState.keyStates[DEXPROS_KEY_NUM_LOCK];
 
@@ -420,7 +420,7 @@ static void SwitchPS2KNumLock()
     }
 }
 
-static void SwitchPS2KScrollLock()
+static void SwitchPS2KScrollLock(void)
 {
     const DexprOS_KeyState state = g_PS2KeyboardState.keyStates[DEXPROS_KEY_SCROLL_LOCK];
 

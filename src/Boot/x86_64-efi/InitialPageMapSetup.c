@@ -66,28 +66,25 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
     };
 
     UINTN numTablesPerLevel[3] = {
+        1, 1, 1
+    };
+
+
+
+
+    EFI_PHYSICAL_ADDRESS highestResolvedAddress = 0;
+
+    EFI_PHYSICAL_ADDRESS highestTableIndices[3] = {
         0, 0, 0
     };
 
 
-    UINTN tableLevelEndIndices[3] = {
-        0, 0, 0
-    };
-
-
-    EFI_PHYSICAL_ADDRESS traversingBaseAddress = 0;
-
-    bool hasNextAddress = true;
-
-
-    while (hasNextAddress)
+    for (;;)
     {
-        EFI_PHYSICAL_ADDRESS nextLowestAddress = traversingBaseAddress;
-        UINTN numLowestAddressHighestRange = 0;
-        hasNextAddress = false;
+        EFI_PHYSICAL_ADDRESS memoryRangeBase = 0;
+        EFI_PHYSICAL_ADDRESS memoryRangeLast = 0;
 
-
-        // Try to find the next lowest physical memory address
+        // Find the next lowest continuous memory region to process
         const unsigned char* pUefiMemoryMapBytes = (const unsigned char*)pUefiMemoryMap;
         for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
         {
@@ -99,64 +96,71 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
                 continue;
 
 
-            if (pMemoryDesc->PhysicalStart >= traversingBaseAddress &&
-                (!hasNextAddress || pMemoryDesc->PhysicalStart < nextLowestAddress))
+            EFI_PHYSICAL_ADDRESS descStart = pMemoryDesc->PhysicalStart;
+            EFI_PHYSICAL_ADDRESS mapMin = descStart > highestResolvedAddress ? descStart : highestResolvedAddress;
+            EFI_PHYSICAL_ADDRESS mapMax = descStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+
+            if (mapMax > highestResolvedAddress)
             {
-                nextLowestAddress = pMemoryDesc->PhysicalStart;
-                hasNextAddress = true;
+                if (memoryRangeLast == 0)
+                {
+                    memoryRangeBase = mapMin;
+                    memoryRangeLast = mapMax;
+                }
+                else if (mapMin < memoryRangeBase)
+                {
+                    memoryRangeBase = mapMin;
+                    memoryRangeLast = mapMax;
+                }
+                else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
+                {
+                    memoryRangeLast = mapMax;
+                }
             }
         }
-        if (framebufferBase >= traversingBaseAddress &&
-            (!hasNextAddress || framebufferBase < nextLowestAddress))
+        if (framebufferBase + framebufferSize > highestResolvedAddress)
         {
-            nextLowestAddress = framebufferBase;
-            hasNextAddress = true;
-        }
+            EFI_PHYSICAL_ADDRESS mapMin = framebufferBase > highestResolvedAddress ? framebufferBase : highestResolvedAddress;
+            EFI_PHYSICAL_ADDRESS mapMax = framebufferBase + framebufferSize;
 
-
-        // Find the highest number of pages of a given base address
-        for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
-        {
-            const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemoryMapBytes + memOffset);
-
-            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
-                continue;
-
-
-            if (pMemoryDesc->PhysicalStart == nextLowestAddress)
+            if (memoryRangeLast == 0)
             {
-                if (numLowestAddressHighestRange < pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE)
-                    numLowestAddressHighestRange = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+            }
+            else if (mapMin < memoryRangeBase)
+            {
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+            }
+            else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
+            {
+                memoryRangeLast = mapMax;
             }
         }
-        if (framebufferBase == nextLowestAddress)
-        {
-            if (numLowestAddressHighestRange < framebufferSize)
-                numLowestAddressHighestRange = framebufferSize;
-        }
 
 
-        UINTN memoryRangeSize = numLowestAddressHighestRange;
-        EFI_PHYSICAL_ADDRESS memoryRangeBase = nextLowestAddress;
-        EFI_PHYSICAL_ADDRESS memoryRangeLast = nextLowestAddress + memoryRangeSize;
+        // No memory ranges left
+        if (memoryRangeLast == 0)
+            break;
 
-
+        // Count additional table levels
         for (int iLevel = 0; iLevel < 3; ++iLevel)
         {
-            const UINTN tableManagedMemory = managedMemorySizePerTableLevel[iLevel];
-            
-            UINTN minTableIndex = memoryRangeBase / tableManagedMemory;
-            UINTN maxTableIndex = (memoryRangeLast + tableManagedMemory) / tableManagedMemory;
+            UINTN tableManSize = managedMemorySizePerTableLevel[iLevel];
 
-            if (minTableIndex < tableLevelEndIndices[iLevel])
-                minTableIndex = tableLevelEndIndices[iLevel];
+            UINTN startTableIndex = (memoryRangeBase / tableManSize);
+            UINTN endTableIndex = ((memoryRangeLast - 1) / tableManSize);
 
-            numTablesPerLevel[iLevel] += (maxTableIndex - minTableIndex);
-            tableLevelEndIndices[iLevel] = maxTableIndex;
+            UINTN numRangeTables = endTableIndex - startTableIndex;
+            if (highestTableIndices[iLevel] < startTableIndex)
+                numRangeTables += 1;
+
+            highestTableIndices[iLevel] = endTableIndex;
+            numTablesPerLevel[iLevel] += numRangeTables;
         }
 
-
-        traversingBaseAddress = memoryRangeLast;
+        highestResolvedAddress = memoryRangeLast;
     }
 
 
@@ -186,28 +190,23 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
     };
 
     UINTN numTablesPerLevel[4] = {
-        0, 0, 0, 0
+        1, 1, 1, 1
     };
 
 
-    UINTN tableLevelEndIndices[4] = {
+
+    EFI_PHYSICAL_ADDRESS highestResolvedAddress = 0;
+
+    EFI_PHYSICAL_ADDRESS highestTableIndices[4] = {
         0, 0, 0, 0
     };
 
-
-    EFI_PHYSICAL_ADDRESS traversingBaseAddress = 0;
-
-    bool hasNextAddress = true;
-
-
-    while (hasNextAddress)
+    for (;;)
     {
-        EFI_PHYSICAL_ADDRESS nextLowestAddress = traversingBaseAddress;
-        UINTN numLowestAddressHighestRange = 0;
-        hasNextAddress = false;
+        EFI_PHYSICAL_ADDRESS memoryRangeBase = 0;
+        EFI_PHYSICAL_ADDRESS memoryRangeLast = 0;
 
-
-        // Try to find the next lowest physical memory address
+        // Find the next lowest continuous memory region to process
         const unsigned char* pUefiMemoryMapBytes = (const unsigned char*)pUefiMemoryMap;
         for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
         {
@@ -219,64 +218,71 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
                 continue;
 
 
-            if (pMemoryDesc->PhysicalStart >= traversingBaseAddress &&
-                (!hasNextAddress || pMemoryDesc->PhysicalStart < nextLowestAddress))
+            EFI_PHYSICAL_ADDRESS descStart = pMemoryDesc->PhysicalStart;
+            EFI_PHYSICAL_ADDRESS mapMin = descStart > highestResolvedAddress ? descStart : highestResolvedAddress;
+            EFI_PHYSICAL_ADDRESS mapMax = descStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+
+            if (mapMax > highestResolvedAddress)
             {
-                nextLowestAddress = pMemoryDesc->PhysicalStart;
-                hasNextAddress = true;
+                if (memoryRangeLast == 0)
+                {
+                    memoryRangeBase = mapMin;
+                    memoryRangeLast = mapMax;
+                }
+                else if (mapMin < memoryRangeBase)
+                {
+                    memoryRangeBase = mapMin;
+                    memoryRangeLast = mapMax;
+                }
+                else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
+                {
+                    memoryRangeLast = mapMax;
+                }
             }
         }
-        if (framebufferBase >= traversingBaseAddress &&
-            (!hasNextAddress || framebufferBase < nextLowestAddress))
+        if (framebufferBase + framebufferSize > highestResolvedAddress)
         {
-            nextLowestAddress = framebufferBase;
-            hasNextAddress = true;
-        }
+            EFI_PHYSICAL_ADDRESS mapMin = framebufferBase > highestResolvedAddress ? framebufferBase : highestResolvedAddress;
+            EFI_PHYSICAL_ADDRESS mapMax = framebufferBase + framebufferSize;
 
-
-        // Find the highest number of pages of a given base address
-        for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
-        {
-            const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemoryMapBytes + memOffset);
-
-            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
-                continue;
-
-
-            if (pMemoryDesc->PhysicalStart == nextLowestAddress)
+            if (memoryRangeLast == 0)
             {
-                if (numLowestAddressHighestRange < pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE)
-                    numLowestAddressHighestRange = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+            }
+            else if (mapMin < memoryRangeBase)
+            {
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+            }
+            else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
+            {
+                memoryRangeLast = mapMax;
             }
         }
-        if (framebufferBase == nextLowestAddress)
-        {
-            if (numLowestAddressHighestRange < framebufferSize)
-                numLowestAddressHighestRange = framebufferSize;
-        }
 
 
-        UINTN memoryRangeSize = numLowestAddressHighestRange;
-        EFI_PHYSICAL_ADDRESS memoryRangeBase = nextLowestAddress;
-        EFI_PHYSICAL_ADDRESS memoryRangeLast = nextLowestAddress + memoryRangeSize;
+        // No memory ranges left
+        if (memoryRangeLast == 0)
+            break;
 
-
+        // Count additional table levels
         for (int iLevel = 0; iLevel < 4; ++iLevel)
         {
-            const UINTN tableManagedMemory = managedMemorySizePerTableLevel[iLevel];
-            
-            UINTN minTableIndex = memoryRangeBase / tableManagedMemory;
-            UINTN maxTableIndex = (memoryRangeLast + tableManagedMemory) / tableManagedMemory;
+            UINTN tableManSize = managedMemorySizePerTableLevel[iLevel];
 
-            if (minTableIndex < tableLevelEndIndices[iLevel])
-                minTableIndex = tableLevelEndIndices[iLevel];
+            UINTN startTableIndex = (memoryRangeBase / tableManSize);
+            UINTN endTableIndex = ((memoryRangeLast - 1) / tableManSize);
 
-            numTablesPerLevel[iLevel] += (maxTableIndex - minTableIndex);
-            tableLevelEndIndices[iLevel] = maxTableIndex;
+            UINTN numRangeTables = endTableIndex - startTableIndex;
+            if (highestTableIndices[iLevel] < startTableIndex)
+                numRangeTables += 1;
+
+            highestTableIndices[iLevel] = endTableIndex;
+            numTablesPerLevel[iLevel] += numRangeTables;
         }
 
-
-        traversingBaseAddress = memoryRangeLast;
+        highestResolvedAddress = memoryRangeLast;
     }
 
 
