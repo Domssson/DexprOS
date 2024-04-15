@@ -17,6 +17,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/BuiltInBitmapFont.c
                             src/Kernel/ErrorDisplay.c
                             src/Kernel/KernelPanic.c
+                            src/Kernel/KernelAssert.c
                             src/Kernel/KeyboardInput.c
                             src/Kernel/x86_64/InlineAsm.c
                             src/Kernel/x86_64/CpuidRetrieve.s
@@ -32,6 +33,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/IdtCreator.c
                             src/Kernel/x86_64/SyscallHandler.s
                             src/Kernel/x86_64/PageMapSwitching.s
+                            src/Kernel/kstdlib/string.c
                             src/Drivers/Graphics/GraphicsDriver.c
                             src/Drivers/Graphics/CpuGraphicsDriver.c
                             src/Drivers/PICDriver.c
@@ -47,6 +49,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/BuiltInBitmapFont.h
                            include/DexprOS/Kernel/ErrorDisplay.h
                            include/DexprOS/Kernel/KernelPanic.h
+                           include/DexprOS/Kernel/KernelAssert.h
                            include/DexprOS/Kernel/KeyboardInput.h
                            include/DexprOS/Kernel/x86_64/InlineAsm.h
                            include/DexprOS/Kernel/x86_64/CpuidRetrieve.h
@@ -62,6 +65,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/x86_64/SyscallHandler.h
                            include/DexprOS/Kernel/x86_64/TaskStateSegment.h
                            include/DexprOS/Kernel/x86_64/PageMapSwitching.h
+                           include/DexprOS/Kernel/kstdlib/string.h
                            include/DexprOS/Drivers/Graphics/GraphicsDriver.h
                            include/DexprOS/Drivers/Graphics/CpuGraphicsDriver.h
                            include/DexprOS/Drivers/PICDriver.h

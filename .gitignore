@@ -1,3 +1,4 @@
 build
 util/util-font-gen/build
+util/tests/KernelStringH/build
 

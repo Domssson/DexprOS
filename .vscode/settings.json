@@ -4,6 +4,8 @@
     ],
     "files.associations": {
         "gdtsetup.h": "c",
-        "cpuid.h": "c"
+        "cpuid.h": "c",
+        "stddef.h": "c",
+        "kernelpanic.h": "c"
     }
 }

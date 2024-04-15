@@ -1,5 +1,7 @@
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
 
+#include "DexprOS/Kernel/kstdlib/string.h"
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -44,115 +46,6 @@ typedef struct DexprOS_CpuGrGraphicsDrvData
 
     DexprOS_CpuGrSwapBufferInfo swapBufferInfo;
 } DexprOS_CpuGrGraphicsDrvData;
-
-
-
-static void* CpuGrGraphicsMemcpy(void* dest, const void* source, size_t count)
-{
-    uintptr_t destValue = (uintptr_t)dest;
-    uintptr_t sourceValue = (uintptr_t)source;
-    
-    if ((destValue % 8) == (sourceValue % 8) && count >= 8)
-    {
-        uint8_t numAlignBytes = (destValue % 8);
-
-        uint8_t* pAlignDst = (uint8_t*)dest;
-        const uint8_t* pAlignSrc = (const uint8_t*)source;
-        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
-        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
-        {
-            *pAlignDst = *pAlignSrc;
-        }
-
-        uint64_t* pDst = (uint64_t*)pAlignDst;
-        const uint64_t* pSrc = (const uint64_t*)pAlignSrc;
-        const uint64_t* pSrcEnd = pSrc + (count - numAlignBytes) / 8;
-        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
-        {
-            *pDst = *pSrc;
-        }
-
-        size_t numRemBytes = ((count - numAlignBytes) % 8);
-        uint8_t* pRemDst = (uint8_t*)pDst;
-        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
-        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
-        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
-        {
-            *pRemDst = *pRemSrc;
-        }
-    }
-    else if ((destValue % 4) == (sourceValue % 4) && count >= 4)
-    {
-        uint8_t numAlignBytes = (destValue % 4);
-
-        uint8_t* pAlignDst = (uint8_t*)dest;
-        const uint8_t* pAlignSrc = (const uint8_t*)source;
-        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
-        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
-        {
-            *pAlignDst = *pAlignSrc;
-        }
-
-        uint32_t* pDst = (uint32_t*)pAlignDst;
-        const uint32_t* pSrc = (const uint32_t*)pAlignSrc;
-        const uint32_t* pSrcEnd = pSrc + (count - numAlignBytes) / 4;
-        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
-        {
-            *pDst = *pSrc;
-        }
-
-        size_t numRemBytes = ((count - numAlignBytes) % 4);
-        uint8_t* pRemDst = (uint8_t*)pDst;
-        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
-        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
-        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
-        {
-            *pRemDst = *pRemSrc;
-        }
-    }
-    else if ((destValue % 2) == (sourceValue % 2) && count >= 2)
-    {
-        uint8_t numAlignBytes = (destValue % 2);
-
-        uint8_t* pAlignDst = (uint8_t*)dest;
-        const uint8_t* pAlignSrc = (const uint8_t*)source;
-        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
-        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
-        {
-            *pAlignDst = *pAlignSrc;
-        }
-
-        uint16_t* pDst = (uint16_t*)pAlignDst;
-        const uint16_t* pSrc = (const uint16_t*)pAlignSrc;
-        const uint16_t* pSrcEnd = pSrc + (count - numAlignBytes) / 2;
-        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
-        {
-            *pDst = *pSrc;
-        }
-
-        size_t numRemBytes = ((count - numAlignBytes) % 2);
-        uint8_t* pRemDst = (uint8_t*)pDst;
-        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
-        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
-        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
-        {
-            *pRemDst = *pRemSrc;
-        }
-    }
-    else
-    {
-        unsigned char* pDst = (unsigned char*)dest;
-        const unsigned char* pSrc = (const unsigned char*)source;
-        const unsigned char* pSrcEnd = pSrc + count;
-
-        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
-        {
-            *pDst = *pSrc;
-        }
-    }
-
-    return dest;
-}
 
 
 
@@ -212,9 +105,9 @@ static void CpuGrSwapBuffers(void* pDrvData)
     {
     case DEXPROS_CPU_GR_SWAP_BUFFER_FULL_OP:
         {
-            CpuGrGraphicsMemcpy(pData->pMainFramebufferMemory,
-                                  pData->pRenderFramebufferMemory,
-                                  pData->mainFramebufferSize);
+            memcpy(pData->pMainFramebufferMemory,
+                   pData->pRenderFramebufferMemory,
+                   pData->mainFramebufferSize);
         }
         break;
     
@@ -240,7 +133,7 @@ static void CpuGrSwapBuffers(void* pDrvData)
             {
                 unsigned char* pRowDst = pDst + h * rowBytes;
                 const unsigned char* pRowSrc = pSrc + h * rowBytes;
-                CpuGrGraphicsMemcpy(pRowDst, pRowSrc, regionRowBytes);
+                memcpy(pRowDst, pRowSrc, regionRowBytes);
             }
         }
         break;

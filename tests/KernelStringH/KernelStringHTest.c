@@ -1,0 +1,1039 @@
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+
+
+
+
+void* kmemset(void* dest, int ch, size_t count);
+
+
+#if __STDC_VERSION__ >= 199901L // C99
+
+void* kmemcpy(void* restrict dest, const void* restrict src, size_t count);
+
+#else
+
+void* kmemcpy(void* dest, const void* src, size_t count);
+
+#endif
+
+
+void* kmemmove(void* dest, const void* src, size_t count);
+
+
+int kmemcmp(const void* lhs, const void* rhs, size_t count);
+
+
+
+
+void* kmemset(void* dest, int ch, size_t count)
+{
+    if (count == 0 || dest == NULL)
+        return dest;
+
+    const unsigned char valueToSet = (unsigned char)ch;
+
+    unsigned char* pCurrentDest = (unsigned char*)dest;
+    size_t copiedBytes = 0;
+
+
+    // At the beginning, copy a few bytes so the data pointer is aligned
+    // to 8 bytes
+
+    const unsigned bytesToAlignTo8 = ((uintptr_t)pCurrentDest % 8);
+
+    if (bytesToAlignTo8 != 0 || count < bytesToAlignTo8 + 8)
+    {
+        const uint8_t numBytesToCopy = (count < (bytesToAlignTo8 + 8) ? count : bytesToAlignTo8);
+        const unsigned char* const pCopyRegionEnd = pCurrentDest + numBytesToCopy;
+
+        for (; pCurrentDest < pCopyRegionEnd; pCurrentDest += 1)
+            *pCurrentDest = valueToSet;
+        
+        copiedBytes += numBytesToCopy;
+    }
+
+    if (copiedBytes == count)
+        return dest;
+
+
+    // Set as much memory as we can through 64-bit integers
+
+    {
+        const uint64_t valueToSet64Single = (uint64_t)valueToSet;
+        const uint64_t valueToSet64 = valueToSet64Single | (valueToSet64Single << 8) |
+                                      (valueToSet64Single << 16) | (valueToSet64Single << 24) |
+                                      (valueToSet64Single << 32) | (valueToSet64Single << 40) |
+                                      (valueToSet64Single << 48) | (valueToSet64Single << 56);
+
+        const size_t numFitting8Bytes = (count - copiedBytes) / 8;
+        uint64_t* pDest8 = (uint64_t*)pCurrentDest;
+        const uint64_t* const pCopyRegion8End = pDest8 + numFitting8Bytes;
+
+        for (; pDest8 < pCopyRegion8End; pDest8 += 1)
+            *pDest8 = valueToSet64;
+
+        pCurrentDest += numFitting8Bytes * 8;
+        copiedBytes += numFitting8Bytes * 8;
+    }
+
+
+    // Copy the rest of unaligned data, if any
+
+    {
+        const size_t numBytesLeft = count - copiedBytes;
+        const unsigned char* const pCopyRegionEnd = pCurrentDest + numBytesLeft;
+
+        for (; pCurrentDest < pCopyRegionEnd; pCurrentDest += 1)
+            *pCurrentDest = valueToSet;
+    }
+
+    return dest;
+}
+
+
+#if __STDC_VERSION__ >= 199901L // C99
+void* kmemcpy(void* restrict dest, const void* restrict src, size_t count)
+#else
+void* kmemcpy(void* dest, const void* src, size_t count)
+#endif
+{
+    if (dest == NULL || src == NULL || count == 0)
+        return dest;
+
+    if (src == dest)
+        return dest;
+    
+
+    uintptr_t destValue = (uintptr_t)dest;
+    uintptr_t sourceValue = (uintptr_t)src;
+
+
+    // GCC requires that freestanding implementation of memcpy() supports
+    // copying data over overlapping memory regions.
+    if (sourceValue < destValue + count && sourceValue + count > destValue &&
+        destValue > sourceValue)
+        return kmemmove(dest, src, count);
+    
+    
+    if ((destValue % 8) == (sourceValue % 8) && count >= 8)
+    {
+        uint8_t numAlignBytes = (destValue % 8);
+
+        uint8_t* pAlignDst = (uint8_t*)dest;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
+        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
+        {
+            *pAlignDst = *pAlignSrc;
+        }
+
+        uint64_t* pDst = (uint64_t*)pAlignDst;
+        const uint64_t* pSrc = (const uint64_t*)pAlignSrc;
+        const uint64_t* pSrcEnd = pSrc + (count - numAlignBytes) / 8;
+        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
+        {
+            *pDst = *pSrc;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 8);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
+        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
+        {
+            *pRemDst = *pRemSrc;
+        }
+    }
+    else if ((destValue % 4) == (sourceValue % 4) && count >= 4)
+    {
+        uint8_t numAlignBytes = (destValue % 4);
+
+        uint8_t* pAlignDst = (uint8_t*)dest;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
+        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
+        {
+            *pAlignDst = *pAlignSrc;
+        }
+
+        uint32_t* pDst = (uint32_t*)pAlignDst;
+        const uint32_t* pSrc = (const uint32_t*)pAlignSrc;
+        const uint32_t* pSrcEnd = pSrc + (count - numAlignBytes) / 4;
+        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
+        {
+            *pDst = *pSrc;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 4);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
+        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
+        {
+            *pRemDst = *pRemSrc;
+        }
+    }
+    else if ((destValue % 2) == (sourceValue % 2) && count >= 2)
+    {
+        uint8_t numAlignBytes = (destValue % 2);
+
+        uint8_t* pAlignDst = (uint8_t*)dest;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcEnd = pAlignSrc + numAlignBytes;
+        for (; pAlignSrc != pAlignSrcEnd; ++pAlignSrc, ++pAlignDst)
+        {
+            *pAlignDst = *pAlignSrc;
+        }
+
+        uint16_t* pDst = (uint16_t*)pAlignDst;
+        const uint16_t* pSrc = (const uint16_t*)pAlignSrc;
+        const uint16_t* pSrcEnd = pSrc + (count - numAlignBytes) / 2;
+        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
+        {
+            *pDst = *pSrc;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 2);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcEnd = pRemSrc + numRemBytes;
+        for (; pRemSrc != pRemSrcEnd; ++pRemSrc, ++pRemDst)
+        {
+            *pRemDst = *pRemSrc;
+        }
+    }
+    else
+    {
+        unsigned char* pDst = (unsigned char*)dest;
+        const unsigned char* pSrc = (const unsigned char*)src;
+        const unsigned char* pSrcEnd = pSrc + count;
+
+        for (; pSrc != pSrcEnd; ++pSrc, ++pDst)
+        {
+            *pDst = *pSrc;
+        }
+    }
+
+    return dest;
+}
+
+
+void* kmemmove(void* dest, const void* src, size_t count)
+{
+    if (dest == NULL || src == NULL || count == 0)
+        return dest;
+
+    if (src == dest)
+        return dest;
+
+
+    uintptr_t destValue = (uintptr_t)dest;
+    uintptr_t sourceValue = (uintptr_t)src;
+
+    
+    // Call memcpy if the memory ranges aren't overlapping
+    if (sourceValue + count <= destValue || sourceValue >= destValue + count)
+        return kmemcpy(dest, src, count);
+
+
+    // If the dest memory starts before source memory, it's safe to copy
+    // the data forwards from the beggining of the buffer as memcpy() does.
+    if (destValue < sourceValue)
+        return kmemcpy(dest, src, count);
+
+
+    // Copy the data backwards from the end of the buffer
+
+    uintptr_t destEndValue = destValue + count;
+    uintptr_t sourceEndValue = sourceValue + count;
+
+    if ((destEndValue % 8) == (sourceEndValue % 8) && count >= 8)
+    {
+        uint8_t numAlignBytes = (destEndValue % 8);
+
+        uint8_t* pAlignDst = (uint8_t*)dest + count - 1;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcLast = pAlignSrc + numAlignBytes - 1;
+        for (; pAlignSrcLast >= pAlignSrc; --pAlignSrcLast, --pAlignDst)
+        {
+            *pAlignDst = *pAlignSrcLast;
+        }
+
+        uint64_t* pDst = (uint64_t*)pAlignDst;
+        const uint64_t* pSrc = (const uint64_t*)pAlignSrc;
+        const uint64_t* pSrcLast = pSrc + (count - numAlignBytes) / 8 - 1;
+        for (; pSrcLast >= pSrc; --pSrcLast, --pDst)
+        {
+            *pDst = *pSrcLast;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 8);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcLast = pRemSrc + numRemBytes - 1;
+        for (; pRemSrcLast >= pRemSrc; --pRemSrcLast, --pRemDst)
+        {
+            *pRemDst = *pRemSrcLast;
+        }
+    }
+    else if ((destEndValue % 4) == (sourceEndValue % 4) && count >= 4)
+    {
+        uint8_t numAlignBytes = (destEndValue % 4);
+
+        uint8_t* pAlignDst = (uint8_t*)dest + count - 1;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcLast = pAlignSrc + numAlignBytes - 1;
+        for (; pAlignSrcLast >= pAlignSrc; --pAlignSrcLast, --pAlignDst)
+        {
+            *pAlignDst = *pAlignSrcLast;
+        }
+
+        uint32_t* pDst = (uint32_t*)pAlignDst;
+        const uint32_t* pSrc = (const uint32_t*)pAlignSrc;
+        const uint32_t* pSrcLast = pSrc + (count - numAlignBytes) / 4 - 1;
+        for (; pSrcLast >= pSrc; --pSrcLast, --pDst)
+        {
+            *pDst = *pSrcLast;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 4);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcLast = pRemSrc + numRemBytes - 1;
+        for (; pRemSrcLast >= pRemSrc; --pRemSrcLast, --pRemDst)
+        {
+            *pRemDst = *pRemSrcLast;
+        }
+    }
+    else if ((destEndValue % 2) == (sourceEndValue % 2) && count >= 2)
+    {
+        uint8_t numAlignBytes = (destEndValue % 2);
+
+        uint8_t* pAlignDst = (uint8_t*)dest + count - 1;
+        const uint8_t* pAlignSrc = (const uint8_t*)src;
+        const uint8_t* pAlignSrcLast = pAlignSrc + numAlignBytes - 1;
+        for (; pAlignSrcLast >= pAlignSrc; --pAlignSrcLast, --pAlignDst)
+        {
+            *pAlignDst = *pAlignSrcLast;
+        }
+
+        uint16_t* pDst = (uint16_t*)pAlignDst;
+        const uint16_t* pSrc = (const uint16_t*)pAlignSrc;
+        const uint16_t* pSrcLast = pSrc + (count - numAlignBytes) / 2 - 1;
+        for (; pSrcLast >= pSrc; --pSrcLast, --pDst)
+        {
+            *pDst = *pSrcLast;
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 2);
+        uint8_t* pRemDst = (uint8_t*)pDst;
+        const uint8_t* pRemSrc = (const uint8_t*)pSrc;
+        const uint8_t* pRemSrcLast = pRemSrc + numRemBytes - 1;
+        for (; pRemSrcLast >= pRemSrc; --pRemSrcLast, --pRemDst)
+        {
+            *pRemDst = *pRemSrcLast;
+        }
+    }
+    else
+    {
+        unsigned char* pDst = (unsigned char*)dest + count - 1;
+        const unsigned char* pSrc = (const unsigned char*)src;
+        const unsigned char* pSrcLast = pSrc + count - 1;
+
+        for (; pSrcLast >= pSrc; --pSrcLast, --pDst)
+        {
+            *pDst = *pSrcLast;
+        }
+    }
+
+
+    return dest;
+}
+
+
+int kmemcmp(const void* lhs, const void* rhs, size_t count)
+{
+    if (lhs == NULL || rhs == NULL)
+        return 0;
+
+    if (count == 0 || lhs == rhs)
+        return 0;
+
+
+    uintptr_t lhsValue = (uintptr_t)lhs;
+    uintptr_t rhsValue = (uintptr_t)rhs;
+
+
+
+    if ((lhsValue % 8) == (rhsValue % 8) && count >= 8)
+    {
+        uint8_t numAlignBytes = (lhsValue % 8);
+
+        const uint8_t* pAlignLhs = (const uint8_t*)lhs;
+        const uint8_t* pAlignRhs = (const uint8_t*)rhs;
+        const uint8_t* pAlignLhsEnd = pAlignLhs + numAlignBytes;
+        for (; pAlignLhs != pAlignLhsEnd; ++pAlignLhs, ++pAlignRhs)
+        {
+            if (*pAlignLhs != *pAlignRhs)
+                return ((int)*pAlignLhs) - ((int)*pAlignRhs);
+        }
+
+        const uint64_t* pLhs = (const uint64_t*)pAlignLhs;
+        const uint64_t* pRhs = (const uint64_t*)pAlignRhs;
+        const uint64_t* pLhsEnd = pLhs + (count - numAlignBytes) / 8;
+        for (; pLhs != pLhsEnd; ++pLhs, ++pRhs)
+        {
+            if (*pLhs != *pRhs)
+            {
+                const unsigned char* pU64BytesLhs = (const unsigned char*)pLhs;
+                const unsigned char* pU64BytesRhs = (const unsigned char*)pRhs;
+                for (unsigned i = 0; i < sizeof(uint64_t); ++i)
+                {
+                    if (pU64BytesLhs[i] != pU64BytesRhs[i])
+                        return ((int)pU64BytesLhs[i]) - ((int)pU64BytesRhs[i]);
+                }
+            }
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 8);
+        const uint8_t* pRemLhs = (const uint8_t*)pLhs;
+        const uint8_t* pRemRhs = (const uint8_t*)pRhs;
+        const uint8_t* pRemLhsEnd = pRemLhs + numRemBytes;
+        for (; pRemLhs != pRemLhsEnd; ++pRemLhs, ++pRemRhs)
+        {
+            if (*pRemLhs != *pRemRhs)
+                return ((int)*pRemLhs) - ((int)*pRemRhs);
+        }
+    }
+    else if ((lhsValue % 4) == (rhsValue % 4) && count >= 4)
+    {
+        uint8_t numAlignBytes = (lhsValue % 4);
+
+        const uint8_t* pAlignLhs = (const uint8_t*)lhs;
+        const uint8_t* pAlignRhs = (const uint8_t*)rhs;
+        const uint8_t* pAlignLhsEnd = pAlignLhs + numAlignBytes;
+        for (; pAlignLhs != pAlignLhsEnd; ++pAlignLhs, ++pAlignRhs)
+        {
+            if (*pAlignLhs != *pAlignRhs)
+                return ((int)*pAlignLhs) - ((int)*pAlignRhs);
+        }
+
+        const uint32_t* pLhs = (const uint32_t*)pAlignLhs;
+        const uint32_t* pRhs = (const uint32_t*)pAlignRhs;
+        const uint32_t* pLhsEnd = pLhs + (count - numAlignBytes) / 4;
+        for (; pLhs != pLhsEnd; ++pLhs, ++pRhs)
+        {
+            if (*pLhs != *pRhs)
+            {
+                const unsigned char* pU64BytesLhs = (const unsigned char*)pLhs;
+                const unsigned char* pU64BytesRhs = (const unsigned char*)pRhs;
+                for (unsigned i = 0; i < sizeof(uint32_t); ++i)
+                {
+                    if (pU64BytesLhs[i] != pU64BytesRhs[i])
+                        return ((int)pU64BytesLhs[i]) - ((int)pU64BytesRhs[i]);
+                }
+            }
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 4);
+        const uint8_t* pRemLhs = (const uint8_t*)pLhs;
+        const uint8_t* pRemRhs = (const uint8_t*)pRhs;
+        const uint8_t* pRemLhsEnd = pRemLhs + numRemBytes;
+        for (; pRemLhs != pRemLhsEnd; ++pRemLhs, ++pRemRhs)
+        {
+            if (*pRemLhs != *pRemRhs)
+                return ((int)*pRemLhs) - ((int)*pRemRhs);
+        }
+    }
+    else if ((lhsValue % 2) == (rhsValue % 2) && count >= 2)
+    {
+        uint8_t numAlignBytes = (lhsValue % 2);
+
+        const uint8_t* pAlignLhs = (const uint8_t*)lhs;
+        const uint8_t* pAlignRhs = (const uint8_t*)rhs;
+        const uint8_t* pAlignLhsEnd = pAlignLhs + numAlignBytes;
+        for (; pAlignLhs != pAlignLhsEnd; ++pAlignLhs, ++pAlignRhs)
+        {
+            if (*pAlignLhs != *pAlignRhs)
+                return ((int)*pAlignLhs) - ((int)*pAlignRhs);
+        }
+
+        const uint16_t* pLhs = (const uint16_t*)pAlignLhs;
+        const uint16_t* pRhs = (const uint16_t*)pAlignRhs;
+        const uint16_t* pLhsEnd = pLhs + (count - numAlignBytes) / 2;
+        for (; pLhs != pLhsEnd; ++pLhs, ++pRhs)
+        {
+            if (*pLhs != *pRhs)
+            {
+                const unsigned char* pU64BytesLhs = (const unsigned char*)pLhs;
+                const unsigned char* pU64BytesRhs = (const unsigned char*)pRhs;
+                for (unsigned i = 0; i < sizeof(uint16_t); ++i)
+                {
+                    if (pU64BytesLhs[i] != pU64BytesRhs[i])
+                        return ((int)pU64BytesLhs[i]) - ((int)pU64BytesRhs[i]);
+                }
+            }
+        }
+
+        size_t numRemBytes = ((count - numAlignBytes) % 2);
+        const uint8_t* pRemLhs = (const uint8_t*)pLhs;
+        const uint8_t* pRemRhs = (const uint8_t*)pRhs;
+        const uint8_t* pRemLhsEnd = pRemLhs + numRemBytes;
+        for (; pRemLhs != pRemLhsEnd; ++pRemLhs, ++pRemRhs)
+        {
+            if (*pRemLhs != *pRemRhs)
+                return ((int)*pRemLhs) - ((int)*pRemRhs);
+        }
+    }
+    else
+    {
+        const unsigned char* pLHS = (const unsigned char*)lhs;
+        const unsigned char* pRHS = (const unsigned char*)rhs;
+        const unsigned char* const pLHSEnd = pLHS + count;
+
+        for (; pLHS < pLHSEnd; pLHS += 1, pRHS += 1)
+        {
+            if (*pLHS != *pRHS)
+                return ((int)*pLHS) - ((int)*pRHS);
+        }
+    }
+
+    return 0;
+}
+
+
+void TestMemset(void)
+{
+    unsigned char* pMemory = (unsigned char*)malloc(1024);
+    unsigned char* pRefMemory = (unsigned char*)malloc(1024);
+
+
+    kmemset(pMemory, 1, 1024);
+    memset(pRefMemory, 1, 1024);
+
+    int ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory + 4, 2, 512);
+    memset(pRefMemory + 4, 2, 512);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory + 2, 3, 512);
+    memset(pRefMemory + 2, 3, 512);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory + 1, 4, 738);
+    memset(pRefMemory + 1, 4, 738);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory, 5, 7);
+    memset(pRefMemory, 5, 7);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory, 6, 4);
+    memset(pRefMemory, 6, 4);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory, 7, 2);
+    memset(pRefMemory, 7, 2);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    kmemset(pMemory, 8, 3);
+    memset(pRefMemory, 8, 3);
+
+    ok = memcmp(pMemory, pRefMemory, 1024);
+    assert(ok == 0);
+
+
+    free(pMemory);
+    free(pRefMemory);
+}
+
+
+void TestMemcpy(void)
+{
+    unsigned char* pSrcMemory = (unsigned char*)malloc(1024);
+    unsigned char* pDstMemory = (unsigned char*)malloc(1024);
+    unsigned char* pRefDstMemory = (unsigned char*)malloc(1024);
+
+
+    memset(pSrcMemory, 0, 1024);
+    memset(pSrcMemory + 11, 85, 34);
+    memset(pSrcMemory + 97, 123, 185);
+    memset(pSrcMemory + 259, 251, 362);
+    memset(pSrcMemory + 698, 61, 241);
+    memset(pSrcMemory + 900, 3, 112);
+    pSrcMemory[4] = 20;
+    pSrcMemory[75] = 87;
+    pSrcMemory[755] = 211;
+    pSrcMemory[643] = 46;
+
+
+    kmemcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+    int ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    kmemcpy(pDstMemory + 4, pSrcMemory, 1020);
+    memcpy(pRefDstMemory + 4, pSrcMemory, 1020);
+
+    ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    kmemcpy(pDstMemory + 2, pSrcMemory, 1022);
+    memcpy(pRefDstMemory + 2, pSrcMemory, 1022);
+
+    ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    kmemcpy(pDstMemory + 1, pSrcMemory, 1023);
+    memcpy(pRefDstMemory + 1, pSrcMemory, 1023);
+
+    ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    kmemcpy(pDstMemory + 7, pSrcMemory, 1017);
+    memcpy(pRefDstMemory + 7, pSrcMemory, 1017);
+
+    ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    kmemcpy(pDstMemory, pSrcMemory, 7);
+    memcpy(pRefDstMemory, pSrcMemory, 7);
+
+    ok = memcmp(pDstMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memset(pDstMemory, 0, 1024);
+    memset(pRefDstMemory, 0, 1024);
+
+
+    free(pSrcMemory);
+    free(pDstMemory);
+    free(pRefDstMemory);
+}
+
+
+void TestMemmove(void)
+{
+    unsigned char* pSrcMemory = (unsigned char*)malloc(1024);
+    unsigned char* pDstMemory = (unsigned char*)malloc(1024);
+    unsigned char* pRefDstMemory = (unsigned char*)malloc(1024);
+
+
+    memset(pSrcMemory, 0, 1024);
+    memset(pSrcMemory + 11, 85, 34);
+    memset(pSrcMemory + 97, 123, 185);
+    memset(pSrcMemory + 259, 251, 362);
+    memset(pSrcMemory + 698, 61, 241);
+    memset(pSrcMemory + 900, 3, 112);
+    pSrcMemory[4] = 20;
+    pSrcMemory[75] = 87;
+    pSrcMemory[755] = 211;
+    pSrcMemory[643] = 46;
+
+
+    kmemmove(pRefDstMemory, pSrcMemory, 1024);
+    int ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 256, pDstMemory, 1024 - 256);
+    memmove(pDstMemory + 256, pDstMemory, 1024 - 256);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 260, pDstMemory, 1024 - 260);
+    memmove(pDstMemory + 260, pDstMemory, 1024 - 260);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 258, pDstMemory, 1024 - 258);
+    memmove(pDstMemory + 258, pDstMemory, 1024 - 258);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 257, pDstMemory, 1024 - 257);
+    memmove(pDstMemory + 257, pDstMemory, 1024 - 257);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 256, pDstMemory, 3);
+    memmove(pDstMemory + 256, pDstMemory, 3);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 496, pDstMemory + 512, 512);
+    memmove(pDstMemory + 496, pDstMemory + 512, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 496, pDstMemory + 508, 512);
+    memmove(pDstMemory + 496, pDstMemory + 508, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 496, pDstMemory + 510, 512);
+    memmove(pDstMemory + 496, pDstMemory + 510, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemmove(pDstMemory + 496, pDstMemory + 513, 511);
+    memmove(pDstMemory + 496, pDstMemory + 513, 511);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    // GCC requires that freestanding implementations of memcpy also support
+    // copying over overlapping memory regions
+
+    kmemcpy(pRefDstMemory, pSrcMemory, 1024);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 256, pDstMemory, 1024 - 256);
+    memmove(pDstMemory + 256, pDstMemory, 1024 - 256);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 260, pDstMemory, 1024 - 260);
+    memmove(pDstMemory + 260, pDstMemory, 1024 - 260);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 258, pDstMemory, 1024 - 258);
+    memmove(pDstMemory + 258, pDstMemory, 1024 - 258);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 257, pDstMemory, 1024 - 257);
+    memmove(pDstMemory + 257, pDstMemory, 1024 - 257);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 256, pDstMemory, 3);
+    memmove(pDstMemory + 256, pDstMemory, 3);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 496, pDstMemory + 512, 512);
+    memmove(pDstMemory + 496, pDstMemory + 512, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 496, pDstMemory + 508, 512);
+    memmove(pDstMemory + 496, pDstMemory + 508, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 496, pDstMemory + 510, 512);
+    memmove(pDstMemory + 496, pDstMemory + 510, 512);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+    memcpy(pDstMemory, pSrcMemory, 1024);
+    memcpy(pRefDstMemory, pSrcMemory, 1024);
+
+
+    kmemcpy(pDstMemory + 496, pDstMemory + 513, 511);
+    memmove(pDstMemory + 496, pDstMemory + 513, 511);
+    ok = memcmp(pSrcMemory, pRefDstMemory, 1024);
+    assert(ok == 0);
+
+
+
+    free(pSrcMemory);
+    free(pDstMemory);
+    free(pRefDstMemory);
+}
+
+
+void TestMemcmp(void)
+{
+    unsigned char* pLhsMemory = (unsigned char*)malloc(1024);
+    unsigned char* pRhsMemory = (unsigned char*)malloc(1024);
+
+
+    memset(pLhsMemory, 7, 1024);
+    memset(pRhsMemory, 7, 1024);
+
+    int result = kmemcmp(pLhsMemory, pRhsMemory, 1024);
+    int refResult = memcmp(pLhsMemory, pRhsMemory, 1024);
+
+    int ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+    refResult = memcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+    refResult = memcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+    
+
+    result = kmemcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+    refResult = memcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    pLhsMemory[612] = (unsigned char)9;
+
+    result = kmemcmp(pLhsMemory, pRhsMemory, 1024);
+    refResult = memcmp(pLhsMemory, pRhsMemory, 1024);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+    refResult = memcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+    refResult = memcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+    
+
+    result = kmemcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+    refResult = memcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+
+    pLhsMemory[600] = (unsigned char)5;
+
+    result = kmemcmp(pLhsMemory, pRhsMemory, 1024);
+    refResult = memcmp(pLhsMemory, pRhsMemory, 1024);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+    refResult = memcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+    refResult = memcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+    
+
+    result = kmemcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+    refResult = memcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    pRhsMemory[576] = (unsigned char)11;
+
+    result = kmemcmp(pLhsMemory, pRhsMemory, 1024);
+    refResult = memcmp(pLhsMemory, pRhsMemory, 1024);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+    refResult = memcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+    refResult = memcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+    
+
+    result = kmemcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+    refResult = memcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    pRhsMemory[345] = (unsigned char)3;
+
+    result = kmemcmp(pLhsMemory, pRhsMemory, 1024);
+    refResult = memcmp(pLhsMemory, pRhsMemory, 1024);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+    refResult = memcmp(pLhsMemory + 4, pRhsMemory + 4, 1020);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    result = kmemcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+    refResult = memcmp(pLhsMemory + 2, pRhsMemory + 2, 1022);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+    
+
+    result = kmemcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+    refResult = memcmp(pLhsMemory + 1, pRhsMemory + 1, 1023);
+
+    ok = (result == 0 && refResult == 0) || (result > 0 && refResult > 0) || (result < 0 && refResult < 0);
+    assert(ok);
+
+
+    free(pLhsMemory);
+    free(pRhsMemory);
+}
+
+
+int main(int argc, char** argv)
+{
+    TestMemset();
+    TestMemcpy();
+    TestMemmove();
+    TestMemcmp();
+
+
+    (void)argc;
+    (void)argv;
+}
+
+
