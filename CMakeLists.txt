@@ -8,8 +8,6 @@ set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_C_EXTENSIONS OFF)
 
 
-message(NOTICE "Notice: The only supported compiler to build DexprOS is MinGW for now.")
-
 
 set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Boot/x86_64-efi/InitialPageMapSetup.c
@@ -23,6 +21,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/CpuidRetrieve.s
                             src/Kernel/x86_64/CpuFeatures.c
                             src/Kernel/x86_64/FloatingPointInit.s
+                            src/Kernel/x86_64/FloatingPointSymbols.c
                             src/Kernel/x86_64/KernelPanicHalt.s
                             src/Kernel/x86_64/TaskStateSegment.c
                             src/Kernel/x86_64/GdtCreator.c
@@ -81,8 +80,17 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
 add_executable(BOOTX64.EFI ${DEXPROS_KERNEL_SOURCES} ${DEXPROS_KERNEL_HEADERS})
 
 
-target_compile_options(BOOTX64.EFI PRIVATE -ffreestanding -mno-red-zone -fshort-wchar -fno-stack-protector)
-target_link_options(BOOTX64.EFI PRIVATE -nostdlib -shared -Wl,-dll -Wl,--subsystem,10 -e efi_main)
+if (CMAKE_C_COMPILER_ID MATCHES GNU) # MinGW
+
+    target_compile_options(BOOTX64.EFI PRIVATE -ffreestanding -mno-red-zone -fshort-wchar -fno-stack-protector)
+    target_link_options(BOOTX64.EFI PRIVATE -nostdlib -shared -Wl,-dll -Wl,--subsystem,10 -e efi_main)
+
+elseif (CMAKE_C_COMPILER_ID MATCHES Clang)
+
+    target_compile_options(BOOTX64.EFI PRIVATE -target x86_64-unknown-windows -ffreestanding -mno-red-zone -fshort-wchar -fno-stack-protector)
+    target_link_options(BOOTX64.EFI PRIVATE -target x86_64-unknown-windows -fuse-ld=lld-link -nostdlib -Wl,-subsystem:efi_application -Wl,-entry:efi_main)
+
+endif()
 
 
 target_compile_options(BOOTX64.EFI PRIVATE -Wall -Wextra -Wpedantic)

@@ -26,14 +26,17 @@ Here are my upcoming plans:
 
 ## Compiling
 
-The only officially supported compiler is 64-bit MinGW. Within the `cmake/cross-compile-toolchains` directory, there is a CMake Toolchain file to easily cross-compile the code on Linux if you have MinGW installed.  
-You can use CMake directly or execute the `build.bash` script if you're running Linux.
+The supported compilers are:
+* Clang. When compiling with Clang, a toolchain file isn't required. A proper target is set automatically when configuring the project.
+* MinGW cross-compiler. Within the `cmake/cross-compile-toolchains` directory, there is a CMake Toolchain file to easily cross-compile the code on Linux if you have MinGW installed.
+
+You can use CMake directly or execute either `build-clang.bash` or `build-mingw.bash` script if you're running Linux.
 
 ## Running
 
 To run on real hardware, create a bootable FAT32 partition on a USB drive. Then copy the `BOOTX64.EFI` file from your build directory to `/EFI/BOOT/BOOTX64.EFI` on your USB.
 
-You can also use the `generate-iso.bash` script to generate a disk image that you can run under QEMU.
+You can also use the `generate-img.bash` script to generate a disk image that you can run under QEMU.
 
 ## Dependencies
 
@@ -43,5 +46,5 @@ You can also use the `generate-iso.bash` script to generate a disk image that yo
 
 ### Building:
 
-- MinGW compiler,
+- Either Clang or MinGW cross-compiler,
 - CMake build system.

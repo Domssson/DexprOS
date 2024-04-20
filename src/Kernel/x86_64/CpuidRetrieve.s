@@ -31,10 +31,10 @@ DexprOS_GetCpuid_EAX1:
 
     /* Save output to memory addresses passed as function input */
     /* Notice: we had moved rcx and rdx to r10 and r11 before */
-    mov %rax, (%r10)
-    mov %rbx, (%r11)
-    mov %rcx, (%r8)
-    mov %rdx, (%r9)
+    mov %eax, (%r10)
+    mov %ebx, (%r11)
+    mov %ecx, (%r8)
+    mov %edx, (%r9)
 
     /* Restore rbx and return 1 on success */
     pop %rbx
@@ -72,10 +72,10 @@ DexprOS_GetCpuid_EAX7_ECX0:
 
     /* Save output to memory addresses passed as function input */
     /* Notice: we had moved rcx and rdx to r10 and r11 before */
-    mov %rax, (%r10)
-    mov %rbx, (%r11)
-    mov %rcx, (%r8)
-    mov %rdx, (%r9)
+    mov %eax, (%r10)
+    mov %ebx, (%r11)
+    mov %ecx, (%r8)
+    mov %edx, (%r9)
 
     /* Restore rbx and return 1 on success */
     pop %rbx

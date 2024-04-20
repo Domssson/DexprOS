@@ -10,5 +10,5 @@ cmake --build .
 cd ..
 
 
-./generate-iso.bash
+./generate-img.bash
 
