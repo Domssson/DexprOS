@@ -11,28 +11,28 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Boot/x86_64-efi/InitialPageMapSetup.c
-                            src/Boot/x86_64-efi/InitialPageMapSwitch.s
+                            src/Boot/x86_64-efi/InitialPageMapSwitch.S
                             src/Kernel/BuiltInBitmapFont.c
                             src/Kernel/ErrorDisplay.c
                             src/Kernel/KernelPanic.c
                             src/Kernel/KernelAssert.c
                             src/Kernel/KeyboardInput.c
                             src/Kernel/x86_64/InlineAsm.c
-                            src/Kernel/x86_64/CpuidRetrieve.s
+                            src/Kernel/x86_64/CpuidRetrieve.S
                             src/Kernel/x86_64/CpuFeatures.c
-                            src/Kernel/x86_64/MemoryProtectionCpuSetup.s
-                            src/Kernel/x86_64/FloatingPointInit.s
+                            src/Kernel/x86_64/MemoryProtectionCpuSetup.S
+                            src/Kernel/x86_64/FloatingPointInit.S
                             src/Kernel/x86_64/FloatingPointSymbols.c
-                            src/Kernel/x86_64/KernelPanicHalt.s
+                            src/Kernel/x86_64/KernelPanicHalt.S
                             src/Kernel/x86_64/TaskStateSegment.c
                             src/Kernel/x86_64/GdtCreator.c
-                            src/Kernel/x86_64/GdtLoader.s
+                            src/Kernel/x86_64/GdtLoader.S
                             src/Kernel/x86_64/GdtSetup.c
-                            src/Kernel/x86_64/Interrupts.s
+                            src/Kernel/x86_64/Interrupts.S
                             src/Kernel/x86_64/InterruptHandlers.c
                             src/Kernel/x86_64/IdtCreator.c
-                            src/Kernel/x86_64/SyscallHandler.s
-                            src/Kernel/x86_64/PageMapSwitching.s
+                            src/Kernel/x86_64/SyscallHandler.S
+                            src/Kernel/x86_64/PageMapSwitching.S
                             src/Kernel/kstdlib/string.c
                             src/Drivers/Graphics/GraphicsDriver.c
                             src/Drivers/Graphics/CpuGraphicsDriver.c
