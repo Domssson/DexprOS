@@ -7,6 +7,7 @@
 #include "DexprOS/Kernel/x86_64/GdtSetup.h"
 #include "DexprOS/Kernel/x86_64/SyscallHandler.h"
 #include "DexprOS/Kernel/x86_64/CpuFeatures.h"
+#include "DexprOS/Kernel/x86_64/MemoryProtectionCpuSetup.h"
 #include "DexprOS/Kernel/x86_64/FloatingPointInit.h"
 #include "DexprOS/Kernel/x86_64/PageMapSwitching.h"
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
@@ -265,6 +266,9 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         DexprOSBoot_SwitchPageMap((uint64_t)pPML);
     }
     
+
+    DexprOS_EnableMemoryProtectionCpuFeatures();
+
 
     DexprOS_InitFloatingPointOperations();
 

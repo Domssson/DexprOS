@@ -20,6 +20,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/InlineAsm.c
                             src/Kernel/x86_64/CpuidRetrieve.s
                             src/Kernel/x86_64/CpuFeatures.c
+                            src/Kernel/x86_64/MemoryProtectionCpuSetup.s
                             src/Kernel/x86_64/FloatingPointInit.s
                             src/Kernel/x86_64/FloatingPointSymbols.c
                             src/Kernel/x86_64/KernelPanicHalt.s
@@ -53,6 +54,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/x86_64/InlineAsm.h
                            include/DexprOS/Kernel/x86_64/CpuidRetrieve.h
                            include/DexprOS/Kernel/x86_64/CpuFeatures.h
+                           include/DexprOS/Kernel/x86_64/MemoryProtectionCpuSetup.h
                            include/DexprOS/Kernel/x86_64/FloatingPointInit.h
                            include/DexprOS/Kernel/x86_64/GdtCreator.h
                            include/DexprOS/Kernel/x86_64/GdtLoader.h
