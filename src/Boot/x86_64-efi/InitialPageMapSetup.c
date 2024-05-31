@@ -34,7 +34,7 @@
 #define DEXPROSBOOT_LEVEL4_PAGE_TABLE_MANAGED_BYTES 0x1000000000000
 
 
-inline static bool ShouldIncludeMemoryTypeInPageMap(EFI_MEMORY_TYPE type)
+inline static bool ShouldIncludeMemoryTypeInPageMap(EFI_MEMORY_TYPE type, UINT64 attributes)
 {
     switch (type)
     {
@@ -44,9 +44,12 @@ inline static bool ShouldIncludeMemoryTypeInPageMap(EFI_MEMORY_TYPE type)
     case EfiRuntimeServicesData:
     case EfiBootServicesCode:
     case EfiBootServicesData:
+    case EfiConventionalMemory:
         return true;
     
     default:
+        if ((attributes & EFI_MEMORY_RUNTIME) == EFI_MEMORY_RUNTIME)
+            return true;
         return false;
     }
 }
@@ -92,7 +95,7 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
 
             // First, we want to map only the memory ranges that are crucial
             // for the bootloader to function. The rest of them will be mapped later.
-            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
+            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type, pMemoryDesc->Attribute))
                 continue;
 
 
@@ -214,7 +217,7 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
 
             // First, we want to map only the memory ranges that are crucial
             // for the bootloader to function. The rest of them will be mapped later.
-            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
+            if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type, pMemoryDesc->Attribute))
                 continue;
 
 
@@ -609,7 +612,7 @@ void* DexprOSBoot_SetupInitialPageMap4(const void* pUefiMemoryMap,
 
         // First, we want to map only the memory ranges that are crucial
         // for the bootloader to function. The rest of them will be mapped later.
-        if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
+        if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type, pMemoryDesc->Attribute))
             continue;
         
 
@@ -672,7 +675,7 @@ void* DexprOSBoot_SetupInitialPageMap5(const void* pUefiMemoryMap,
 
         // First, we want to map only the memory ranges that are crucial
         // for the bootloader to function. The rest of them will be mapped later.
-        if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type))
+        if (!ShouldIncludeMemoryTypeInPageMap(pMemoryDesc->Type, pMemoryDesc->Attribute))
             continue;
         
 

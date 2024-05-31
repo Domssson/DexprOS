@@ -5,6 +5,8 @@
         "cpuid.h": "c",
         "stddef.h": "c",
         "kernelpanic.h": "c",
-        "cpufeatures.h": "c"
+        "cpufeatures.h": "c",
+        "stdbool.h": "c",
+        "physicalmemmap.h": "c"
     }
 }

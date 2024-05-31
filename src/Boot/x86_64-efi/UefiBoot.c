@@ -1,6 +1,7 @@
 #include "DexprOS/Boot/x86_64-efi/InitialPageMapSetup.h"
 #include "DexprOS/Boot/x86_64-efi/InitialPageMapSwitch.h"
 #include "DexprOS/Kernel/ErrorDisplay.h"
+#include "DexprOS/Kernel/PhysicalMemMap.h"
 #include "DexprOS/Kernel/x86_64/Interrupts.h"
 #include "DexprOS/Kernel/x86_64/TaskStateSegment.h"
 #include "DexprOS/Kernel/x86_64/IdtCreator.h"
@@ -10,12 +11,14 @@
 #include "DexprOS/Kernel/x86_64/MemoryProtectionCpuSetup.h"
 #include "DexprOS/Kernel/x86_64/FloatingPointInit.h"
 #include "DexprOS/Kernel/x86_64/PageMapSwitching.h"
+#include "DexprOS/Kernel/efi/PhysicalMemMapEfi.h"
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
 #include "DexprOS/Drivers/PICDriver.h"
 #include "DexprOS/Drivers/PS2ControllerDriver.h"
 #include "DexprOS/Drivers/Keyboard/USKeyboardLayout.h"
 #include "DexprOS/Drivers/Keyboard/PS2KeyboardDriver.h"
 #include "DexprOS/Shell.h"
+#include "DexprOS/Kernel/kstdlib/string.h"
 
 #include <efi.h>
 
@@ -82,6 +85,35 @@ static DexprOS_GraphicsDriver g_graphicsDriver = {0};
 static EFI_SYSTEM_TABLE* g_pUefiSystemTable = NULL;
 
 DexprOS_Shell g_shell;
+
+
+
+static const char* MemTypeToString(DexprOS_PhysicalMemoryType type)
+{
+    switch (type)
+    {
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_UNUSABLE:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_UNUSABLE";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_FIRMWARE_RESERVED:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_FIRMWARE_RESERVED";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_UNACCEPTED:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_UNACCEPTED";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE_PERSISTENT:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_PERSISTENT";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_RECLAIM:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_RECLAIM";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_NVS:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_NVS";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_CODE:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_CODE";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_DATA:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_DATA";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_Max:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_Max";
+    }
+}
 
 
 EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
@@ -273,6 +305,47 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     DexprOS_InitFloatingPointOperations();
 
 
+    // Now conventional memory is identity mapped. Find a region big enough to
+    // hold a physical memory map in the OS's format.
+
+    size_t memMapSize = DexprOS_GetPhysicalMemMapSizeFromEfi(pMemoryMapBuffer,
+                                                             memoryMapSize,
+                                                             memoryDescriptorSize,
+                                                             memoryDescriptorVersion);
+
+    EFI_PHYSICAL_ADDRESS physicalMemMapAddress = 0;
+    bool rangeFound = false;
+    for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
+    {
+        const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)((char*)pMemoryMapBuffer + memOffset);
+        if (pMemoryDesc->Type == EfiConventionalMemory &&
+            pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE >= memMapSize)
+        {
+            physicalMemMapAddress = pMemoryDesc->PhysicalStart;
+            rangeFound = true;
+            break;
+        }
+    }
+
+    if (!rangeFound)
+        return EFI_OUT_OF_RESOURCES;
+
+    void* pPhysicalMapMemory = (void*)(physicalMemMapAddress);
+    memset(pPhysicalMapMemory, 0, memMapSize);
+
+    
+    DexprOS_PhysicalMemMap physicalMemMap;
+    if (!DexprOS_CreatePhysicalMemMapFromEfi(&physicalMemMap,
+                                             pMemoryMapBuffer,
+                                             memoryMapSize,
+                                             memoryDescriptorSize,
+                                             memoryDescriptorVersion,
+                                             pPhysicalMapMemory,
+                                             memMapSize))
+        return EFI_OUT_OF_RESOURCES;
+    
+
+
     uint64_t tssAdresses[1];
     uint16_t tssSizes[1];
     DexprOS_TaskStateSegment taskStateSegments[1] = {0};
@@ -329,6 +402,30 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     testDisplayUint64Hex((uint64_t)pNewPageMapBuffer);
     DexprOS_ShellPuts(&g_shell, ", size: ");
     testDisplayUint64Hex(newPageMapBufferSize);
+    DexprOS_ShellPuts(&g_shell, "\n\n");
+
+
+    DexprOS_ShellPuts(&g_shell, "Memory map address: ");
+    testDisplayUint64Hex((uint64_t)pPhysicalMapMemory);
+    DexprOS_ShellPuts(&g_shell, "\nNum memory map range entries: ");
+    testDisplayUint64Hex(physicalMemMap.numEntries);
+    DexprOS_ShellPuts(&g_shell, ", size: ");
+    testDisplayUint64Hex(physicalMemMap.numEntries * sizeof(DexprOS_PhysicalMemoryRange));
+    DexprOS_ShellPuts(&g_shell, "\n\n");
+
+
+    for (size_t i = 0; i < physicalMemMap.numEntries; ++i)
+    {
+        DexprOS_ShellPuts(&g_shell, "Memory range start: ");
+        testDisplayUint64Hex(physicalMemMap.pEntries[i].physicalAddress);
+        DexprOS_ShellPuts(&g_shell, ", size: ");
+        testDisplayUint64Hex(physicalMemMap.pEntries[i].rangeSize);
+        DexprOS_ShellPuts(&g_shell, ", type: ");
+        DexprOS_ShellPuts(&g_shell, MemTypeToString(physicalMemMap.pEntries[i].memoryType));
+        DexprOS_ShellPuts(&g_shell, ", flags: ");
+        testDisplayUint64Hex(physicalMemMap.pEntries[i].flags);
+        DexprOS_ShellPuts(&g_shell, "\n");
+    }
     DexprOS_ShellPuts(&g_shell, "\n\n");
     
 

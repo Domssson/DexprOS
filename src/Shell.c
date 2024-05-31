@@ -581,7 +581,7 @@ static void DexprOS_ShellHelp(DexprOS_Shell* pShell, const DexprOS_Shell_Char* a
                               "After typing a command and its space-separated arguments (if any), hit Enter to execute.\n"
                               "Lines starting with '#' are comments and are not interpreted as commands.\n"
                               "\n"
-                              "List of all avaible commands:\n"
+                              "List of all available commands:\n"
                               "help - displays this message\n"
                               "echo [MESSAGE] - prints a given message on the screen\n"
                               "clear - clears the screen\n"
