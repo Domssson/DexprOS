@@ -110,32 +110,55 @@ size_t DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
 {
     size_t numEntries = 0;
 
+
     EFI_PHYSICAL_ADDRESS lastRangeEnd = 0;
     DexprOS_PhysicalMemoryType lastRangeType = DEXPROS_PHYSICAL_MEMORY_TYPE_Max;
     UINT64 lastRangeAttributes = 0;
 
-    bool firstRange = true;
-
-    // Combine ranges wherever possible
     const unsigned char* pUefiMemMapBytes = (const unsigned char*)pUefiMemoryMap;
-    for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
-    {
-        const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemMapBytes + memOffset);
-        DexprOS_PhysicalMemoryType memType = ToDexprOSMemType(pMemoryDesc->Type);
 
-        if (firstRange ||
-            lastRangeEnd != pMemoryDesc->PhysicalStart ||
-            lastRangeType != memType ||
-            lastRangeAttributes != pMemoryDesc->Attribute)
+    for (;;)
+    {
+        EFI_PHYSICAL_ADDRESS lowestAddress = 0;
+        UINTN numPages = 0;
+        DexprOS_PhysicalMemoryType memType = DEXPROS_PHYSICAL_MEMORY_TYPE_Max;
+        UINT64 memAttributes = 0;
+
+        bool nextDescFound = false;
+
+        for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
         {
-            numEntries += 1;
-            firstRange = false;
+            const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemMapBytes + memOffset);
+
+            if (pMemoryDesc->PhysicalStart >= lastRangeEnd &&
+                (pMemoryDesc->PhysicalStart < lowestAddress || !nextDescFound))
+            {
+                lowestAddress = pMemoryDesc->PhysicalStart;
+                numPages = pMemoryDesc->NumberOfPages;
+                memType = ToDexprOSMemType(pMemoryDesc->Type);
+                memAttributes = pMemoryDesc->Attribute;
+                nextDescFound = true;
+            }
         }
 
-        lastRangeEnd = pMemoryDesc->PhysicalStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+        if (!nextDescFound)
+            break;
+
+        // Combine ranges wherever possible
+        if (lastRangeEnd != lowestAddress ||
+            memType != lastRangeType ||
+            memAttributes != lastRangeAttributes ||
+            numEntries == 0)
+        {
+            numEntries += 1;
+        }
+
+        lastRangeEnd = lowestAddress + numPages * EFI_PAGE_SIZE;
         lastRangeType = memType;
-        lastRangeAttributes = pMemoryDesc->Attribute;
+        lastRangeAttributes = memAttributes;
     }
+
+
 
     size_t totalSize = numEntries * sizeof(DexprOS_PhysicalMemoryRange);
 
@@ -156,24 +179,47 @@ bool DexprOS_CreatePhysicalMemMapFromEfi(DexprOS_PhysicalMemMap* pResult,
     DexprOS_PhysicalMemoryRange* pEntries = (DexprOS_PhysicalMemoryRange*)pBuffer;
 
 
+    size_t index = 0;
+    bool firstRangeWrite = true;
+
+
     EFI_PHYSICAL_ADDRESS lastRangeEnd = 0;
     DexprOS_PhysicalMemoryType lastRangeType = DEXPROS_PHYSICAL_MEMORY_TYPE_Max;
     UINT64 lastRangeAttributes = 0;
 
-    size_t index = 0;
-    bool firstRangeWrite = true;
-
-    // Combine ranges wherever possible
     const unsigned char* pUefiMemMapBytes = (const unsigned char*)pUefiMemoryMap;
-    for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
+
+    for (;;)
     {
-        const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemMapBytes + memOffset);
-        DexprOS_PhysicalMemoryType memType = ToDexprOSMemType(pMemoryDesc->Type);
+        EFI_PHYSICAL_ADDRESS lowestAddress = 0;
+        UINTN numPages = 0;
+        DexprOS_PhysicalMemoryType memType = DEXPROS_PHYSICAL_MEMORY_TYPE_Max;
+        UINT64 memAttributes = 0;
+
+        bool nextDescFound = false;
+
+        for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
+        {
+            const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)(pUefiMemMapBytes + memOffset);
+
+            if (pMemoryDesc->PhysicalStart >= lastRangeEnd &&
+                (pMemoryDesc->PhysicalStart < lowestAddress || !nextDescFound))
+            {
+                lowestAddress = pMemoryDesc->PhysicalStart;
+                numPages = pMemoryDesc->NumberOfPages;
+                memType = ToDexprOSMemType(pMemoryDesc->Type);
+                memAttributes = pMemoryDesc->Attribute;
+                nextDescFound = true;
+            }
+        }
+
+        if (!nextDescFound)
+            break;
 
 
-        if (lastRangeEnd != pMemoryDesc->PhysicalStart ||
+        if (lastRangeEnd != lowestAddress ||
             lastRangeType != memType ||
-            lastRangeAttributes != pMemoryDesc->Attribute)
+            lastRangeAttributes != memAttributes)
         {
             if (!firstRangeWrite)
             {
@@ -189,20 +235,20 @@ bool DexprOS_CreatePhysicalMemMapFromEfi(DexprOS_PhysicalMemMap* pResult,
         if (firstRangeWrite)
         {
             pEntries[index].memoryType = memType;
-            pEntries[index].physicalAddress = pMemoryDesc->PhysicalStart;
-            pEntries[index].rangeSize = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
-            pEntries[index].flags = ToDexprOSAttributeFlags(pMemoryDesc->Attribute);
+            pEntries[index].physicalAddress = lowestAddress;
+            pEntries[index].rangeSize = numPages * EFI_PAGE_SIZE;
+            pEntries[index].flags = ToDexprOSAttributeFlags(memAttributes);
             firstRangeWrite = false;
         }
         else
         {
-            pEntries[index].rangeSize += pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+            pEntries[index].rangeSize += numPages * EFI_PAGE_SIZE;
         }
 
 
-        lastRangeEnd = pMemoryDesc->PhysicalStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+        lastRangeEnd = lowestAddress + numPages * EFI_PAGE_SIZE;
         lastRangeType = memType;
-        lastRangeAttributes = pMemoryDesc->Attribute;
+        lastRangeAttributes = memAttributes;
     }
 
     pResult->numEntries = index + 1;

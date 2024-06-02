@@ -69,7 +69,7 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
     };
 
     UINTN numTablesPerLevel[3] = {
-        1, 1, 1
+        0, 0, 0
     };
 
 
@@ -77,7 +77,7 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
 
     EFI_PHYSICAL_ADDRESS highestResolvedAddress = 0;
 
-    EFI_PHYSICAL_ADDRESS highestTableIndices[3] = {
+    UINTN highestTableIndices[3] = {
         0, 0, 0
     };
 
@@ -86,6 +86,7 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
     {
         EFI_PHYSICAL_ADDRESS memoryRangeBase = 0;
         EFI_PHYSICAL_ADDRESS memoryRangeLast = 0;
+        bool memoryRangeFound = false;
 
         // Find the next lowest continuous memory region to process
         const unsigned char* pUefiMemoryMapBytes = (const unsigned char*)pUefiMemoryMap;
@@ -99,55 +100,28 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
                 continue;
 
 
-            EFI_PHYSICAL_ADDRESS descStart = pMemoryDesc->PhysicalStart;
-            EFI_PHYSICAL_ADDRESS mapMin = descStart > highestResolvedAddress ? descStart : highestResolvedAddress;
-            EFI_PHYSICAL_ADDRESS mapMax = descStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+            EFI_PHYSICAL_ADDRESS mapMin = pMemoryDesc->PhysicalStart;
+            EFI_PHYSICAL_ADDRESS mapMax = mapMin + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
 
-            if (mapMax > highestResolvedAddress)
+            if (mapMin >= highestResolvedAddress && (mapMin < memoryRangeBase || !memoryRangeFound))
             {
-                if (memoryRangeLast == 0)
-                {
-                    memoryRangeBase = mapMin;
-                    memoryRangeLast = mapMax;
-                }
-                else if (mapMin < memoryRangeBase)
-                {
-                    memoryRangeBase = mapMin;
-                    memoryRangeLast = mapMax;
-                }
-                else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
-                {
-                    memoryRangeLast = mapMax;
-                }
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+                memoryRangeFound = true;
             }
         }
-        if (framebufferBase + framebufferSize > highestResolvedAddress)
+        if (framebufferBase >= highestResolvedAddress && (framebufferBase < memoryRangeLast || !memoryRangeFound))
         {
-            EFI_PHYSICAL_ADDRESS mapMin = framebufferBase > highestResolvedAddress ? framebufferBase : highestResolvedAddress;
-            EFI_PHYSICAL_ADDRESS mapMax = framebufferBase + framebufferSize;
-
-            if (memoryRangeLast == 0)
-            {
-                memoryRangeBase = mapMin;
-                memoryRangeLast = mapMax;
-            }
-            else if (mapMin < memoryRangeBase)
-            {
-                memoryRangeBase = mapMin;
-                memoryRangeLast = mapMax;
-            }
-            else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
-            {
-                memoryRangeLast = mapMax;
-            }
+            memoryRangeBase = framebufferBase;
+            memoryRangeLast = framebufferBase + framebufferSize;
+            memoryRangeFound = true;
         }
 
 
-        // No memory ranges left
-        if (memoryRangeLast == 0)
+        if (!memoryRangeFound)
             break;
 
-        // Count additional table levels
+        // Count number of tables per level
         for (int iLevel = 0; iLevel < 3; ++iLevel)
         {
             UINTN tableManSize = managedMemorySizePerTableLevel[iLevel];
@@ -156,7 +130,8 @@ UINTN DexprOSBoot_CalculatePageMap4SizeForLoader(const void* pUefiMemoryMap,
             UINTN endTableIndex = ((memoryRangeLast - 1) / tableManSize);
 
             UINTN numRangeTables = endTableIndex - startTableIndex;
-            if (highestTableIndices[iLevel] < startTableIndex)
+
+            if (highestTableIndices[iLevel] < startTableIndex || numTablesPerLevel[iLevel] == 0)
                 numRangeTables += 1;
 
             highestTableIndices[iLevel] = endTableIndex;
@@ -193,14 +168,14 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
     };
 
     UINTN numTablesPerLevel[4] = {
-        1, 1, 1, 1
+        0, 0, 0, 0
     };
 
 
 
     EFI_PHYSICAL_ADDRESS highestResolvedAddress = 0;
 
-    EFI_PHYSICAL_ADDRESS highestTableIndices[4] = {
+    UINTN highestTableIndices[4] = {
         0, 0, 0, 0
     };
 
@@ -208,6 +183,7 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
     {
         EFI_PHYSICAL_ADDRESS memoryRangeBase = 0;
         EFI_PHYSICAL_ADDRESS memoryRangeLast = 0;
+        bool memoryRangeFound = false;
 
         // Find the next lowest continuous memory region to process
         const unsigned char* pUefiMemoryMapBytes = (const unsigned char*)pUefiMemoryMap;
@@ -221,55 +197,28 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
                 continue;
 
 
-            EFI_PHYSICAL_ADDRESS descStart = pMemoryDesc->PhysicalStart;
-            EFI_PHYSICAL_ADDRESS mapMin = descStart > highestResolvedAddress ? descStart : highestResolvedAddress;
-            EFI_PHYSICAL_ADDRESS mapMax = descStart + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+            EFI_PHYSICAL_ADDRESS mapMin = pMemoryDesc->PhysicalStart;
+            EFI_PHYSICAL_ADDRESS mapMax = mapMin + pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
 
-            if (mapMax > highestResolvedAddress)
+            if (mapMin >= highestResolvedAddress && (mapMin < memoryRangeBase || !memoryRangeFound))
             {
-                if (memoryRangeLast == 0)
-                {
-                    memoryRangeBase = mapMin;
-                    memoryRangeLast = mapMax;
-                }
-                else if (mapMin < memoryRangeBase)
-                {
-                    memoryRangeBase = mapMin;
-                    memoryRangeLast = mapMax;
-                }
-                else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
-                {
-                    memoryRangeLast = mapMax;
-                }
+                memoryRangeBase = mapMin;
+                memoryRangeLast = mapMax;
+                memoryRangeFound = true;
             }
         }
-        if (framebufferBase + framebufferSize > highestResolvedAddress)
+        if (framebufferBase >= highestResolvedAddress && (framebufferBase < memoryRangeLast || !memoryRangeFound))
         {
-            EFI_PHYSICAL_ADDRESS mapMin = framebufferBase > highestResolvedAddress ? framebufferBase : highestResolvedAddress;
-            EFI_PHYSICAL_ADDRESS mapMax = framebufferBase + framebufferSize;
-
-            if (memoryRangeLast == 0)
-            {
-                memoryRangeBase = mapMin;
-                memoryRangeLast = mapMax;
-            }
-            else if (mapMin < memoryRangeBase)
-            {
-                memoryRangeBase = mapMin;
-                memoryRangeLast = mapMax;
-            }
-            else if (mapMin == memoryRangeBase && mapMax > memoryRangeLast)
-            {
-                memoryRangeLast = mapMax;
-            }
+            memoryRangeBase = framebufferBase;
+            memoryRangeLast = framebufferBase + framebufferSize;
+            memoryRangeFound = true;
         }
 
 
-        // No memory ranges left
-        if (memoryRangeLast == 0)
+        if (!memoryRangeFound)
             break;
 
-        // Count additional table levels
+        // Count number of tables per level
         for (int iLevel = 0; iLevel < 4; ++iLevel)
         {
             UINTN tableManSize = managedMemorySizePerTableLevel[iLevel];
@@ -278,7 +227,7 @@ UINTN DexprOSBoot_CalculatePageMap5SizeForLoader(const void* pUefiMemoryMap,
             UINTN endTableIndex = ((memoryRangeLast - 1) / tableManSize);
 
             UINTN numRangeTables = endTableIndex - startTableIndex;
-            if (highestTableIndices[iLevel] < startTableIndex)
+            if (highestTableIndices[iLevel] < startTableIndex || numTablesPerLevel[iLevel] == 0)
                 numRangeTables += 1;
 
             highestTableIndices[iLevel] = endTableIndex;

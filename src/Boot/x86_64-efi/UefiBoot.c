@@ -661,7 +661,7 @@ EFI_STATUS DexprOSBoot_GetMemoryMapAndPageMapBuffer(EFI_SYSTEM_TABLE* pSystemTab
             return EFI_SUCCESS;
 
         // Otherwise make the new buffer two times bigger than the requested
-        // size as the size we need reported by memory map will increase
+        // size as the size we need reported by memory map may increase
         // at the second attempt
         UINTN requiredPages = (requiredPageMapSize + EFI_PAGE_SIZE - 1) / EFI_PAGE_SIZE;
         numPreviousPages = numNewEfiPages;
