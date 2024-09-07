@@ -34,6 +34,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/IdtCreator.c
                             src/Kernel/x86_64/SyscallHandler.S
                             src/Kernel/x86_64/PageMapSwitching.S
+                            src/Kernel/efi/EfiMemMapIteration.c
                             src/Kernel/efi/PhysicalMemMapEfi.c
                             src/Kernel/kstdlib/string.c
                             src/Drivers/Graphics/GraphicsDriver.c
@@ -70,6 +71,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/x86_64/TaskStateSegment.h
                            include/DexprOS/Kernel/x86_64/PageMapSwitching.h
                            include/DexprOS/Kernel/kstdlib/string.h
+                           include/DexprOS/Kernel/efi/EfiMemMapIteration.h
                            include/DexprOS/Kernel/efi/PhysicalMemMapEfi.h
                            include/DexprOS/Drivers/Graphics/GraphicsDriver.h
                            include/DexprOS/Drivers/Graphics/CpuGraphicsDriver.h

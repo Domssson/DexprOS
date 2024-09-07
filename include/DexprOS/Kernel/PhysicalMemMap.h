@@ -12,6 +12,7 @@ extern "C"
 
 typedef size_t DexprOS_PhysicalMemoryAddress;
 typedef size_t DexprOS_PhysicalMemorySize;
+typedef uint64_t DexprOS_PhysicalMemoryFlags;
 
 
 typedef enum DexprOS_PhysicalMemoryType
@@ -57,7 +58,7 @@ typedef struct DexprOS_PhysicalMemoryRange
     DexprOS_PhysicalMemoryAddress physicalAddress;
     DexprOS_PhysicalMemorySize rangeSize;
 
-    uint64_t flags;
+    DexprOS_PhysicalMemoryFlags flags;
 } DexprOS_PhysicalMemoryRange;
 
 

@@ -436,10 +436,10 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         __asm__ volatile("hlt");
 
 
-    DexprOS_DestroyShell(&g_shell);
+    //DexprOS_DestroyShell(&g_shell);
 
     // Unload the graphics driver
-    DexprOS_DestroyCpuGraphicsDriver(&g_graphicsDriver);
+    //DexprOS_DestroyCpuGraphicsDriver(&g_graphicsDriver);
 
     return EFI_SUCCESS;
 }
