@@ -13,7 +13,7 @@ For now, DexprOS is able to:
 - load a working General Descriptor Table and Interrupt Descriptor Table,
 - setup PIC (Programmable Interrupt Controller) and PS/2 controller,
 - handle keyboard input and convert it to unicode characters,
-- process a few commands in a simple shell: echo, clear, help, shutdown, reboot.
+- process a few commands in a simple shell: echo, clear, help, version, shutdown, reboot.
 
 ## Planned features
 
@@ -48,3 +48,4 @@ You can also use the `generate-img.bash` script to generate a disk image that yo
 
 - Either Clang or MinGW cross-compiler,
 - CMake build system.
+- `mtools` for generating a disk image for VMs.

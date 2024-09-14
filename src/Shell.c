@@ -8,6 +8,7 @@
 static void DexprOS_ShellEcho(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
 static void DexprOS_ShellClear(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
 static void DexprOS_ShellHelp(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
+static void DexprOS_ShellVersion(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
 static void DexprOS_ShellShutdown(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
 static void DexprOS_ShellReboot(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength);
 
@@ -17,11 +18,12 @@ typedef struct DexprOS_Shell_CommandFunc
     void (*commandFunc)(DexprOS_Shell*, const DexprOS_Shell_Char*, size_t);
 } DexprOS_Shell_CommandFunc;
 
-#define DEXPROS_SHELL_NUM_BUILTIN_COMMANDS 5
+#define DEXPROS_SHELL_NUM_BUILTIN_COMMANDS 6
 static const DexprOS_Shell_CommandFunc g_DexprOS_ShellBuiltInCommands[DEXPROS_SHELL_NUM_BUILTIN_COMMANDS] = {
     {"echo", DexprOS_ShellEcho},
     {"clear", DexprOS_ShellClear},
     {"help", DexprOS_ShellHelp},
+    {"version", DexprOS_ShellVersion},
     {"shutdown", DexprOS_ShellShutdown},
     {"reboot", DexprOS_ShellReboot}
 };
@@ -576,17 +578,25 @@ static void DexprOS_ShellClear(DexprOS_Shell* pShell, const DexprOS_Shell_Char* 
 
 static void DexprOS_ShellHelp(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength)
 {
-    DexprOS_ShellPuts(pShell, "DexprOS version: pre-release 0.1.2\n"
-                              "User help menu:\n\n"
+    DexprOS_ShellPuts(pShell, "User help menu:\n\n"
                               "After typing a command and its space-separated arguments (if any), hit Enter to execute.\n"
                               "Lines starting with '#' are comments and are not interpreted as commands.\n"
                               "\n"
                               "List of all available commands:\n"
-                              "help - displays this message\n"
+                              "help - prints this message\n"
+                              "version - prints the operating system version\n"
                               "echo [MESSAGE] - prints a given message on the screen\n"
                               "clear - clears the screen\n"
                               "shutdown - powers off the computer\n"
                               "reboot - reboots the computer\n");
+
+    (void)arg;
+    (void)argLength;
+}
+
+static void DexprOS_ShellVersion(DexprOS_Shell* pShell, const DexprOS_Shell_Char* arg, size_t argLength)
+{
+    DexprOS_ShellPuts(pShell, "DexprOS version: pre-release 0.1.2\n");
 
     (void)arg;
     (void)argLength;
