@@ -27,10 +27,10 @@ Here are my upcoming plans:
 ## Compiling
 
 The supported compilers are:
-* Clang. When compiling with Clang, a toolchain file isn't required. A proper target is set automatically when configuring the project.
-* MinGW cross-compiler. Within the `cmake/cross-compile-toolchains` directory, there is a CMake Toolchain file to easily cross-compile the code on Linux if you have MinGW installed.
+* Clang. When compiling with Clang, one can use the toolchain file `cmake/cross-compile-toolchains/x86_64-uefi-clang-generic.cmake`.
+* MinGW cross-compiler. `cmake/cross-compile-toolchains/x86_64-w64-mingw32-generic.cmake` is the toolchain file you can use to easily cross-compile the code on Linux if you have MinGW installed.
 
-You can use CMake directly or execute either `build-clang.bash` or `build-mingw.bash` script if you're running Linux.
+You can use CMake directly or execute either `build-clang.bash` or `build-mingw.bash` script if you're running Linux. The scripts will also generate a VM disk image by executing `generate-img.bash`
 
 ## Running
 
@@ -48,4 +48,4 @@ You can also use the `generate-img.bash` script to generate a disk image that yo
 
 - Either Clang or MinGW cross-compiler,
 - CMake build system.
-- `mtools` for generating a disk image for VMs.
+- `mtools` for generating disk images for VMs.

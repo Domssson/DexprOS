@@ -4,7 +4,7 @@ mkdir -p build
 
 cd build
 
-env CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_TOOLCHAIN_FILE="../cmake/cross-compile-toolchains/x86_64-uefi-clang-generic.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 
 cd ..
