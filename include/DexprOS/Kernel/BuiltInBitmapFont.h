@@ -2,7 +2,7 @@
 #define DEXPROS_KERNEL_BUILTINBITMAPFONT_H_INCLUDED
 
 #include "DexprOS/Drivers/Graphics/GraphicsDriver.h"
-#include "DexprOS/DexprOSCommon.h"
+#include "DexprOS/Kernel/DexprOSCommon.h"
 
 #include <stdint.h>
 #include <stddef.h>

@@ -3,7 +3,7 @@
 
 #include "DexprOS/Drivers/Graphics/GraphicsDriver.h"
 #include "DexprOS/Kernel/KeyboardInput.h"
-#include "DexprOS/DexprOSCommon.h"
+#include "DexprOS/Kernel/DexprOSCommon.h"
 
 #include <stdint.h>
 #include <stdbool.h>

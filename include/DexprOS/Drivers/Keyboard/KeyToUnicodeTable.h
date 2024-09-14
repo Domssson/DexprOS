@@ -2,7 +2,7 @@
 #define DEXPROS_DRIVERS_KEYBOARD_KEYTOUNICODETABLE_H_INCLUDED
 
 #include "DexprOS/Kernel/KeyboardInput.h"
-#include "DexprOS/DexprOSCommon.h"
+#include "DexprOS/Kernel/DexprOSCommon.h"
 
 #include <stdint.h>
 #include <stddef.h>

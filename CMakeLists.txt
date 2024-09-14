@@ -10,6 +10,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 
 set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
+                            src/Boot/x86_64-efi/EndBootPhase.c
                             src/Boot/x86_64-efi/InitialPageMapSetup.c
                             src/Boot/x86_64-efi/InitialPageMapSwitch.S
                             src/Kernel/BuiltInBitmapFont.c
@@ -17,7 +18,8 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/KernelPanic.c
                             src/Kernel/KernelAssert.c
                             src/Kernel/KeyboardInput.c
-                            src/Kernel/PhysicalMemMap.c
+                            src/Kernel/Memory/PhysicalMemMap.c
+                            src/Kernel/Memory/PhysicalMemTree.c
                             src/Kernel/x86_64/InlineAsm.c
                             src/Kernel/x86_64/CpuidRetrieve.S
                             src/Kernel/x86_64/CpuFeatures.c
@@ -36,6 +38,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/PageMapSwitching.S
                             src/Kernel/efi/EfiMemMapIteration.c
                             src/Kernel/efi/PhysicalMemMapEfi.c
+                            src/Kernel/efi/PhysicalMemTreeGenEfi.c
                             src/Kernel/kstdlib/string.c
                             src/Drivers/Graphics/GraphicsDriver.c
                             src/Drivers/Graphics/CpuGraphicsDriver.c
@@ -46,15 +49,19 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Drivers/Keyboard/PS2KeyboardDriver.c
                             src/Shell.c)
 
-set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
+set(DEXPROS_KERNEL_HEADERS include/DexprOS/Boot/x86_64-efi/EndBootPhase.h
                            include/DexprOS/Boot/x86_64-efi/InitialPageMapSetup.h
                            include/DexprOS/Boot/x86_64-efi/InitialPageMapSwitch.h
                            include/DexprOS/Kernel/BuiltInBitmapFont.h
+                           include/DexprOS/Kernel/DexprOSCommon.h
                            include/DexprOS/Kernel/ErrorDisplay.h
                            include/DexprOS/Kernel/KernelPanic.h
                            include/DexprOS/Kernel/KernelAssert.h
                            include/DexprOS/Kernel/KeyboardInput.h
-                           include/DexprOS/Kernel/PhysicalMemMap.h
+                           include/DexprOS/Kernel/Memory/MemoryDef.h
+                           include/DexprOS/Kernel/Memory/Paging.h
+                           include/DexprOS/Kernel/Memory/PhysicalMemMap.h
+                           include/DexprOS/Kernel/Memory/PhysicalMemTree.h
                            include/DexprOS/Kernel/x86_64/InlineAsm.h
                            include/DexprOS/Kernel/x86_64/CpuidRetrieve.h
                            include/DexprOS/Kernel/x86_64/CpuFeatures.h
@@ -73,6 +80,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/DexprOSCommon.h
                            include/DexprOS/Kernel/kstdlib/string.h
                            include/DexprOS/Kernel/efi/EfiMemMapIteration.h
                            include/DexprOS/Kernel/efi/PhysicalMemMapEfi.h
+                           include/DexprOS/Kernel/efi/PhysicalMemTreeGenEfi.h
                            include/DexprOS/Drivers/Graphics/GraphicsDriver.h
                            include/DexprOS/Drivers/Graphics/CpuGraphicsDriver.h
                            include/DexprOS/Drivers/PICDriver.h

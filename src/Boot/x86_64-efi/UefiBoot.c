@@ -1,7 +1,7 @@
-#include "DexprOS/Boot/x86_64-efi/InitialPageMapSetup.h"
-#include "DexprOS/Boot/x86_64-efi/InitialPageMapSwitch.h"
+#include "DexprOS/Boot/x86_64-efi/EndBootPhase.h"
 #include "DexprOS/Kernel/ErrorDisplay.h"
-#include "DexprOS/Kernel/PhysicalMemMap.h"
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
+#include "DexprOS/Kernel/Memory/PhysicalMemMap.h"
 #include "DexprOS/Kernel/x86_64/Interrupts.h"
 #include "DexprOS/Kernel/x86_64/TaskStateSegment.h"
 #include "DexprOS/Kernel/x86_64/IdtCreator.h"
@@ -12,6 +12,7 @@
 #include "DexprOS/Kernel/x86_64/FloatingPointInit.h"
 #include "DexprOS/Kernel/x86_64/PageMapSwitching.h"
 #include "DexprOS/Kernel/efi/PhysicalMemMapEfi.h"
+#include "DexprOS/Kernel/efi/PhysicalMemTreeGenEfi.h"
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
 #include "DexprOS/Drivers/PICDriver.h"
 #include "DexprOS/Drivers/PS2ControllerDriver.h"
@@ -44,39 +45,6 @@
 }*/
 
 
-static EFI_STATUS DexprOSBoot_GetMemoryMap(EFI_SYSTEM_TABLE* pSystemTable,
-                                           void** pMemoryMapBuffer,
-                                           UINTN* pMemoryMapSize,
-                                           UINTN* pMemoryMapKey,
-                                           UINTN* pMemoryDescriptorSize,
-                                           UINT32* pMemoryDescriptorVersion);
-
-static EFI_STATUS DexprOSBoot_GetMemoryMapAndPageMapBuffer(EFI_SYSTEM_TABLE* pSystemTable,
-                                                           void** pMemoryMapBuffer,
-                                                           UINTN* pMemoryMapSize,
-                                                           UINTN* pMemoryMapKey,
-                                                           UINTN* pMemoryDescriptorSize,
-                                                           UINT32* pMemoryDescriptorVersion,
-                                                           EFI_PHYSICAL_ADDRESS* pPageMapBufferAddress,
-                                                           UINTN* pPageMapBufferSize,
-                                                           EFI_PHYSICAL_ADDRESS framebufferBase,
-                                                           UINTN framebufferSize,
-                                                           bool paging5Level);
-
-static EFI_STATUS DexprOSBoot_EndEfiPhase(EFI_HANDLE imageHandle,
-                                          EFI_SYSTEM_TABLE* pSystemTable,
-                                          void** pOutMemoryMapBuffer,
-                                          UINTN* pOutMemoryMapSize,
-                                          UINTN* pOutMemoryMapKey,
-                                          UINTN* pOutMemoryDescriptorSize,
-                                          UINT32* pOutMemoryDescriptorVersion,
-                                          void** pOutPageMapBuffer,
-                                          UINTN* pOutPageMapBufferSize,
-                                          EFI_PHYSICAL_ADDRESS framebufferBase,
-                                          UINTN framebufferSize,
-                                          bool paging5Level);
-
-
 static void testDisplayUint64Hex(uint64_t value);
 
 
@@ -106,6 +74,10 @@ static const char* MemTypeToString(DexprOS_PhysicalMemoryType type)
         return "DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_RECLAIM";
     case DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_NVS:
         return "DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_NVS";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_CODE:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_CODE";
+    case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_DATA:
+        return "DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_DATA";
     case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_CODE:
         return "DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_CODE";
     case DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_DATA:
@@ -113,6 +85,7 @@ static const char* MemTypeToString(DexprOS_PhysicalMemoryType type)
     case DEXPROS_PHYSICAL_MEMORY_TYPE_Max:
         return "DEXPROS_PHYSICAL_MEMORY_TYPE_Max";
     }
+    return "DEXPROS_PHYSICAL_MEMORY_TYPE_Max";
 }
 
 
@@ -224,9 +197,6 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     // Claim memory ownership and exit boot services
 
 
-    bool has5LevelPaging = DexprOS_CheckCpu5LevelPagingSupport();
-
-
     UINTN memoryMapSize = 0;
     UINTN memoryDescriptorSize = 0;
     UINT32 memoryDescriptorVersion = 0;
@@ -236,67 +206,15 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     void* pMemoryMapBuffer = NULL;
 
 
-    void* pNewPageMapBuffer = 0;
-    UINTN newPageMapBufferSize = 0;
-
-
-    status = DexprOSBoot_EndEfiPhase(imageHandle,
-                                     pSystemTable,
-                                     &pMemoryMapBuffer,
-                                     &memoryMapSize,
-                                     &memoryMapKey,
-                                     &memoryDescriptorSize,
-                                     &memoryDescriptorVersion,
-                                     &pNewPageMapBuffer,
-                                     &newPageMapBufferSize,
-                                     pGop->Mode->FrameBufferBase,
-                                     pGop->Mode->FrameBufferSize,
-                                     has5LevelPaging);
-    if (EFI_ERROR(status))
-        return status;
-
-
-    DexprOS_DisableInterrupts();
-
-
-    if (DexprOS_CheckCpu5LevelPagingSupport())
-    {
-        void* pPML = DexprOSBoot_SetupInitialPageMap5(pMemoryMapBuffer,
-                                                      memoryMapSize,
-                                                      memoryDescriptorSize,
-                                                      memoryDescriptorVersion,
-                                                      pGop->Mode->FrameBufferBase,
-                                                      pGop->Mode->FrameBufferSize,
-                                                      pNewPageMapBuffer,
-                                                      newPageMapBufferSize);
-        if (pPML == NULL)
-            return EFI_OUT_OF_RESOURCES;
-        
-        
-        if (DexprOSBoot_Is5LevelPagingActive())
-        {
-            DexprOSBoot_SwitchPageMap((uint64_t)pPML);
-        }
-        else
-        {
-            DexprOSBoot_SwitchPageMap4LevelTo5Level((uint64_t)pPML);
-        }
-    }
-    else
-    {
-        void* pPML = DexprOSBoot_SetupInitialPageMap4(pMemoryMapBuffer,
-                                                      memoryMapSize,
-                                                      memoryDescriptorSize,
-                                                      memoryDescriptorVersion,
-                                                      pGop->Mode->FrameBufferBase,
-                                                      pGop->Mode->FrameBufferSize,
-                                                      pNewPageMapBuffer,
-                                                      newPageMapBufferSize);
-        if (pPML == NULL)
-            return EFI_OUT_OF_RESOURCES;
-        
-        DexprOSBoot_SwitchPageMap((uint64_t)pPML);
-    }
+    status = DexprOSBoot_EndBootPhase(imageHandle,
+                                      pSystemTable,
+                                      pGop->Mode->FrameBufferBase,
+                                      pGop->Mode->FrameBufferSize,
+                                      &pMemoryMapBuffer,
+                                      &memoryMapSize,
+                                      &memoryMapKey,
+                                      &memoryDescriptorSize,
+                                      &memoryDescriptorVersion);
     
 
     DexprOS_EnableMemoryProtectionCpuFeatures();
@@ -306,22 +224,33 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
 
 
     // Now conventional memory is identity mapped. Find a region big enough to
-    // hold a physical memory map in the OS's format.
+    // hold a physical memory map and tree in the OS's format.
 
     size_t memMapSize = DexprOS_GetPhysicalMemMapSizeFromEfi(pMemoryMapBuffer,
                                                              memoryMapSize,
                                                              memoryDescriptorSize,
                                                              memoryDescriptorVersion);
 
-    EFI_PHYSICAL_ADDRESS physicalMemMapAddress = 0;
+    size_t memTreeSize = DexprOS_GetPhysicalMemTreeSizeFromEfi(pMemoryMapBuffer,
+                                                               memoryMapSize,
+                                                               memoryDescriptorSize,
+                                                               memoryDescriptorVersion);
+
+    size_t memTotalSize = 0;
+    memTotalSize += memMapSize;
+    memTotalSize = DEXPROS_ALIGN_FUNDAMENTAL(memTotalSize);
+    memTotalSize += memTreeSize;
+
+
+    EFI_PHYSICAL_ADDRESS physicalMemDataAddress = 0;
     bool rangeFound = false;
     for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
     {
         const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)((char*)pMemoryMapBuffer + memOffset);
         if (pMemoryDesc->Type == EfiConventionalMemory &&
-            pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE >= memMapSize)
+            pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE >= memTotalSize)
         {
-            physicalMemMapAddress = pMemoryDesc->PhysicalStart;
+            physicalMemDataAddress = pMemoryDesc->PhysicalStart;
             rangeFound = true;
             break;
         }
@@ -330,8 +259,18 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     if (!rangeFound)
         return EFI_OUT_OF_RESOURCES;
 
-    void* pPhysicalMapMemory = (void*)(physicalMemMapAddress);
-    memset(pPhysicalMapMemory, 0, memMapSize);
+
+    void* pPhysicalMemData = (void*)(physicalMemDataAddress);
+    memset(pPhysicalMemData, 0, memTotalSize);
+
+
+    DexprOS_PhysicalMemoryAddress physMemMapAddress = physicalMemDataAddress;
+    DexprOS_PhysicalMemoryAddress physMemTreeAddress = physicalMemDataAddress;
+    physMemTreeAddress += memMapSize;
+    physMemTreeAddress = DEXPROS_ALIGN_FUNDAMENTAL(physMemTreeAddress);
+
+    void* pPhysicalMemMapMemory = (void*)physMemMapAddress;
+    void* pPhysicalMemTreeMemory = (void*)physMemTreeAddress;
 
     
     DexprOS_PhysicalMemMap physicalMemMap;
@@ -340,9 +279,12 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
                                              memoryMapSize,
                                              memoryDescriptorSize,
                                              memoryDescriptorVersion,
-                                             pPhysicalMapMemory,
+                                             pPhysicalMemMapMemory,
                                              memMapSize))
         return EFI_OUT_OF_RESOURCES;
+
+
+    // TODO: create physical mem tree
     
 
 
@@ -398,24 +340,13 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
             DexprOS_ShellPuts(&g_shell, "5-level paging active!\n\n");
     }
 
-    DexprOS_ShellPuts(&g_shell, "Page map buffer allocation adress: ");
-    testDisplayUint64Hex((uint64_t)pNewPageMapBuffer);
-    DexprOS_ShellPuts(&g_shell, ", size: ");
-    testDisplayUint64Hex(newPageMapBufferSize);
-    DexprOS_ShellPuts(&g_shell, "\n\n");
-
-
-    DexprOS_ShellPuts(&g_shell, "Memory map address: ");
-    testDisplayUint64Hex((uint64_t)pPhysicalMapMemory);
-    DexprOS_ShellPuts(&g_shell, "\nNum memory map range entries: ");
-    testDisplayUint64Hex(physicalMemMap.numEntries);
-    DexprOS_ShellPuts(&g_shell, ", size: ");
-    testDisplayUint64Hex(physicalMemMap.numEntries * sizeof(DexprOS_PhysicalMemoryRange));
-    DexprOS_ShellPuts(&g_shell, "\n\n");
-
 
     for (size_t i = 0; i < physicalMemMap.numEntries; ++i)
     {
+        if (physicalMemMap.pEntries[i].memoryType != DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE &&
+            physicalMemMap.pEntries[i].memoryType != DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE_PERSISTENT)
+            continue;
+
         DexprOS_ShellPuts(&g_shell, "Memory range start: ");
         testDisplayUint64Hex(physicalMemMap.pEntries[i].physicalAddress);
         DexprOS_ShellPuts(&g_shell, ", size: ");
@@ -426,6 +357,20 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         testDisplayUint64Hex(physicalMemMap.pEntries[i].flags);
         DexprOS_ShellPuts(&g_shell, "\n");
     }
+
+    DexprOS_ShellPuts(&g_shell, "\nMemory map address: ");
+    testDisplayUint64Hex((uint64_t)pPhysicalMemMapMemory);
+    DexprOS_ShellPuts(&g_shell, "\nNum memory map range entries: ");
+    testDisplayUint64Hex(physicalMemMap.numEntries);
+    DexprOS_ShellPuts(&g_shell, ", size: ");
+    testDisplayUint64Hex(physicalMemMap.numEntries * sizeof(DexprOS_PhysicalMemoryRange));
+    DexprOS_ShellPuts(&g_shell, "\nMemory tree buffer address:");
+    testDisplayUint64Hex((uint64_t)pPhysicalMemTreeMemory);
+    DexprOS_ShellPuts(&g_shell, ", size: ");
+    testDisplayUint64Hex(memTreeSize);
+
+
+
     DexprOS_ShellPuts(&g_shell, "\n\n");
     
 
@@ -538,199 +483,6 @@ void testDisplayUint64Hex(uint64_t value)
             break;
         }
     }
-}
-
-
-EFI_STATUS DexprOSBoot_GetMemoryMap(EFI_SYSTEM_TABLE* pSystemTable,
-                                    void** pMemoryMapBuffer,
-                                    UINTN* pMemoryMapSize,
-                                    UINTN* pMemoryMapKey,
-                                    UINTN* pMemoryDescriptorSize,
-                                    UINT32* pMemoryDescriptorVersion)
-{
-    EFI_STATUS status = 0;
-
-    if (*pMemoryMapSize == 0)
-        *pMemoryMapSize = 512;
-
-    for (;;)
-    {
-        if (*pMemoryMapBuffer != NULL)
-        {
-            status = pSystemTable->BootServices->FreePool(*pMemoryMapBuffer);
-            if (EFI_ERROR(status))
-                return status;
-        }
-
-        status = pSystemTable->BootServices->AllocatePool(EfiLoaderData, *pMemoryMapSize, pMemoryMapBuffer);
-        if (EFI_ERROR(status))
-            return status;
-
-        status = pSystemTable->BootServices->GetMemoryMap(pMemoryMapSize,
-                                                          (EFI_MEMORY_DESCRIPTOR*)*pMemoryMapBuffer,
-                                                          pMemoryMapKey,
-                                                          pMemoryDescriptorSize,
-                                                          pMemoryDescriptorVersion);
-
-        if (status == EFI_BUFFER_TOO_SMALL)
-            *pMemoryMapSize += (*pMemoryDescriptorSize) * 2;
-        else
-            return status;
-    }
-}
-
-
-EFI_STATUS DexprOSBoot_GetMemoryMapAndPageMapBuffer(EFI_SYSTEM_TABLE* pSystemTable,
-                                                    void** pMemoryMapBuffer,
-                                                    UINTN* pMemoryMapSize,
-                                                    UINTN* pMemoryMapKey,
-                                                    UINTN* pMemoryDescriptorSize,
-                                                    UINT32* pMemoryDescriptorVersion,
-                                                    EFI_PHYSICAL_ADDRESS* pPageMapBufferAddress,
-                                                    UINTN* pPageMapBufferSize,
-                                                    EFI_PHYSICAL_ADDRESS framebufferBase,
-                                                    UINTN framebufferSize,
-                                                    bool paging5Level)
-{
-    EFI_STATUS status = 0;
-
-
-    UINTN numPreviousPages = (*pPageMapBufferSize + EFI_PAGE_SIZE - 1) / EFI_PAGE_SIZE;
-
-    UINTN numNewEfiPages = numPreviousPages;
-    if (numNewEfiPages == 0)
-        numNewEfiPages = 4;
-
-    
-    for (;;)
-    {
-        if (*pPageMapBufferAddress != 0 &&
-            numPreviousPages != 0)
-        {
-            status = pSystemTable->BootServices->FreePages(*pPageMapBufferAddress,
-                                                           numPreviousPages);
-            if (EFI_ERROR(status))
-                return status;
-        }
-
-
-        // Make sure the max. allocated address for the page map buffer is
-        // lower than 4 GiB in case we want to switch to 5-level paging
-        *pPageMapBufferAddress = 4294967296; // 4 GiB
-        status = pSystemTable->BootServices->AllocatePages(AllocateMaxAddress,
-                                                           EfiLoaderData,
-                                                           numNewEfiPages,
-                                                           pPageMapBufferAddress);
-        if (EFI_ERROR(status))
-            return status;
-
-
-        status = DexprOSBoot_GetMemoryMap(pSystemTable,
-                                          pMemoryMapBuffer,
-                                          pMemoryMapSize,
-                                          pMemoryMapKey,
-                                          pMemoryDescriptorSize,
-                                          pMemoryDescriptorVersion);
-        if (EFI_ERROR(status))
-            return status;
-
-
-        UINTN requiredPageMapSize = 0;
-        if (paging5Level)
-        {
-            requiredPageMapSize = DexprOSBoot_CalculatePageMap5SizeForLoader(*pMemoryMapBuffer,
-                                                                             *pMemoryMapSize,
-                                                                             *pMemoryDescriptorSize,
-                                                                             *pMemoryDescriptorVersion,
-                                                                             framebufferBase,
-                                                                             framebufferSize);
-        }
-        else
-        {
-            requiredPageMapSize = DexprOSBoot_CalculatePageMap4SizeForLoader(*pMemoryMapBuffer,
-                                                                             *pMemoryMapSize,
-                                                                             *pMemoryDescriptorSize,
-                                                                             *pMemoryDescriptorVersion,
-                                                                             framebufferBase,
-                                                                             framebufferSize);
-        }
-
-        // The allocated buffer has the size we need for the new page map!
-        *pPageMapBufferSize = numNewEfiPages * EFI_PAGE_SIZE;
-        if (*pPageMapBufferSize >= requiredPageMapSize)
-            return EFI_SUCCESS;
-
-        // Otherwise make the new buffer two times bigger than the requested
-        // size as the size we need reported by memory map may increase
-        // at the second attempt
-        UINTN requiredPages = (requiredPageMapSize + EFI_PAGE_SIZE - 1) / EFI_PAGE_SIZE;
-        numPreviousPages = numNewEfiPages;
-        numNewEfiPages = requiredPages * 2;
-    }
-}
-
-
-EFI_STATUS DexprOSBoot_EndEfiPhase(EFI_HANDLE imageHandle,
-                                   EFI_SYSTEM_TABLE* pSystemTable,
-                                   void** pOutMemoryMapBuffer,
-                                   UINTN* pOutMemoryMapSize,
-                                   UINTN* pOutMemoryMapKey,
-                                   UINTN* pOutMemoryDescriptorSize,
-                                   UINT32* pOutMemoryDescriptorVersion,
-                                   void** pOutPageMapBuffer,
-                                   UINTN* pOutPageMapBufferSize,
-                                   EFI_PHYSICAL_ADDRESS framebufferBase,
-                                   UINTN framebufferSize,
-                                   bool paging5Level)
-{
-    EFI_STATUS status = 0;
-
-    void* pMemoryBuffer = NULL;
-    UINTN memoryMapSize = 0;
-    UINTN memoryMapKey = 0;
-
-    EFI_PHYSICAL_ADDRESS pageMapBufferAddress = 0;
-    UINTN pageMapBufferSize = 0;
-
-    do
-    {
-        status = DexprOSBoot_GetMemoryMapAndPageMapBuffer(pSystemTable,
-                                                          &pMemoryBuffer,
-                                                          &memoryMapSize,
-                                                          &memoryMapKey,
-                                                          pOutMemoryDescriptorSize,
-                                                          pOutMemoryDescriptorVersion,
-                                                          &pageMapBufferAddress,
-                                                          &pageMapBufferSize,
-                                                          framebufferBase,
-                                                          framebufferSize,
-                                                          paging5Level);
-        if (EFI_ERROR(status))
-            return status;
-
-        status = pSystemTable->BootServices->ExitBootServices(imageHandle,
-                                                              memoryMapKey);
-    } while (status == EFI_INVALID_PARAMETER);
-
-    if (EFI_ERROR(status))
-        return status;
-
-    *pOutMemoryMapBuffer = pMemoryBuffer;
-    *pOutMemoryMapSize = memoryMapSize;
-    *pOutMemoryMapKey = memoryMapKey;
-    *pOutPageMapBuffer = (void*)pageMapBufferAddress;
-    *pOutPageMapBufferSize = pageMapBufferSize;
-
-    
-    pSystemTable->ConsoleInHandle = NULL;
-    pSystemTable->ConIn = NULL;
-    pSystemTable->ConsoleOutHandle = NULL;
-    pSystemTable->ConOut = NULL;
-    pSystemTable->StandardErrorHandle = NULL;
-    pSystemTable->StdErr = NULL;
-    pSystemTable->BootServices = NULL;
-
-    return status;
 }
 
 

@@ -20,8 +20,6 @@ static DexprOS_PhysicalMemoryType ToDexprOSMemType(EFI_MEMORY_TYPE efiType)
         return DEXPROS_PHYSICAL_MEMORY_TYPE_UNACCEPTED;
 
     case EfiConventionalMemory:
-    case EfiBootServicesCode:
-    case EfiBootServicesData:
     case EfiLoaderCode:
     case EfiLoaderData:
         return DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE;
@@ -34,6 +32,11 @@ static DexprOS_PhysicalMemoryType ToDexprOSMemType(EFI_MEMORY_TYPE efiType)
 
     case EfiACPIMemoryNVS:
         return DEXPROS_PHYSICAL_MEMORY_TYPE_ACPI_NVS;
+
+    case EfiBootServicesCode:
+        return DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_CODE;
+    case EfiBootServicesData:
+        return DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_BOOT_SERVICES_DATA;
 
     case EfiRuntimeServicesCode:
         return DEXPROS_PHYSICAL_MEMORY_TYPE_EFI_RUNTIME_SERVICES_CODE;

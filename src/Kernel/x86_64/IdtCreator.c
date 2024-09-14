@@ -2,7 +2,7 @@
 
 #include "DexprOS/Kernel/x86_64/Interrupts.h"
 
-#include "DexprOS/DexprOSCommon.h"
+#include "DexprOS/Kernel/DexprOSCommon.h"
 
 
 #define DEXPROS_X86_64_NUM_IDT_ENTRIES 256

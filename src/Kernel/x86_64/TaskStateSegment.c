@@ -1,6 +1,6 @@
 #include "DexprOS/Kernel/x86_64/TaskStateSegment.h"
 
-#include "DexprOS/DexprOSCommon.h"
+#include "DexprOS/Kernel/DexprOSCommon.h"
 
 
 DEXPROS_ALIGNAS(16)

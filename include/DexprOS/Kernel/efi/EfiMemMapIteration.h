@@ -1,7 +1,7 @@
 #ifndef DEXPROS_KERNEL_EFI_EFIMEMMAPITERATION_H_INCLUDED
 #define DEXPROS_KERNEL_EFI_EFIMEMMAPITERATION_H_INCLUDED
 
-#include "DexprOS/Kernel/PhysicalMemMap.h"
+#include "DexprOS/Kernel/Memory/PhysicalMemMap.h"
 
 #include <efi.h>
 
