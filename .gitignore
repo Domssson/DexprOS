@@ -1,5 +1,10 @@
 build
-util/util-font-gen/build
-util/tests/KernelStringH/build
 
 .vscode
+
+util/util-font-gen/build
+
+tests/KernelStringH/build
+tests/PhysMemManagement/build
+tests/PhysMemManagement/.vscode
+

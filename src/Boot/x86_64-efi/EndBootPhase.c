@@ -312,8 +312,7 @@ static EFI_STATUS ReAllocPageMapBuffer(EFI_SYSTEM_TABLE* pSystemTable,
     EFI_STATUS status = 0;
 
 
-    if (*pBufferAddress != 0 &&
-        numPreviousPages != 0)
+    if (numPreviousPages != 0)
     {
         status = pSystemTable->BootServices->FreePages(*pBufferAddress,
                                                        numPreviousPages);

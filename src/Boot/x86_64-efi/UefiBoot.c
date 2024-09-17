@@ -11,8 +11,7 @@
 #include "DexprOS/Kernel/x86_64/MemoryProtectionCpuSetup.h"
 #include "DexprOS/Kernel/x86_64/FloatingPointInit.h"
 #include "DexprOS/Kernel/x86_64/PageMapSwitching.h"
-#include "DexprOS/Kernel/efi/PhysicalMemMapEfi.h"
-#include "DexprOS/Kernel/efi/PhysicalMemTreeGenEfi.h"
+#include "DexprOS/Kernel/efi/PhysicalMemStructsGenEfi.h"
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
 #include "DexprOS/Drivers/PICDriver.h"
 #include "DexprOS/Drivers/PS2ControllerDriver.h"
@@ -226,20 +225,10 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     // Now conventional memory is identity mapped. Find a region big enough to
     // hold a physical memory map and tree in the OS's format.
 
-    size_t memMapSize = DexprOS_GetPhysicalMemMapSizeFromEfi(pMemoryMapBuffer,
-                                                             memoryMapSize,
-                                                             memoryDescriptorSize,
-                                                             memoryDescriptorVersion);
-
-    size_t memTreeSize = DexprOS_GetPhysicalMemTreeSizeFromEfi(pMemoryMapBuffer,
-                                                               memoryMapSize,
-                                                               memoryDescriptorSize,
-                                                               memoryDescriptorVersion);
-
-    size_t memTotalSize = 0;
-    memTotalSize += memMapSize;
-    memTotalSize = DEXPROS_ALIGN_FUNDAMENTAL(memTotalSize);
-    memTotalSize += memTreeSize;
+    DexprOS_PhysMemStructsEfiSizeData physMemReq = DexprOS_GetPhysicalMemStructsSizeDataFromEfi(pMemoryMapBuffer,
+                                                                                                memoryMapSize,
+                                                                                                memoryDescriptorSize,
+                                                                                                memoryDescriptorVersion);
 
 
     EFI_PHYSICAL_ADDRESS physicalMemDataAddress = 0;
@@ -248,7 +237,7 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     {
         const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)((char*)pMemoryMapBuffer + memOffset);
         if (pMemoryDesc->Type == EfiConventionalMemory &&
-            pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE >= memTotalSize)
+            pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE >= physMemReq.bufferSize)
         {
             physicalMemDataAddress = pMemoryDesc->PhysicalStart;
             rangeFound = true;
@@ -260,31 +249,21 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         return EFI_OUT_OF_RESOURCES;
 
 
-    void* pPhysicalMemData = (void*)(physicalMemDataAddress);
-    memset(pPhysicalMemData, 0, memTotalSize);
-
-
-    DexprOS_PhysicalMemoryAddress physMemMapAddress = physicalMemDataAddress;
-    DexprOS_PhysicalMemoryAddress physMemTreeAddress = physicalMemDataAddress;
-    physMemTreeAddress += memMapSize;
-    physMemTreeAddress = DEXPROS_ALIGN_FUNDAMENTAL(physMemTreeAddress);
-
-    void* pPhysicalMemMapMemory = (void*)physMemMapAddress;
-    void* pPhysicalMemTreeMemory = (void*)physMemTreeAddress;
+    void* pPhysicalMemData = (void*)physicalMemDataAddress;
+    memset(pPhysicalMemData, 0, physMemReq.bufferSize);
 
     
+    DexprOS_PhysicalMemTree physicalMemTree;
     DexprOS_PhysicalMemMap physicalMemMap;
-    if (!DexprOS_CreatePhysicalMemMapFromEfi(&physicalMemMap,
-                                             pMemoryMapBuffer,
-                                             memoryMapSize,
-                                             memoryDescriptorSize,
-                                             memoryDescriptorVersion,
-                                             pPhysicalMemMapMemory,
-                                             memMapSize))
+    if (!DexprOS_CreatePhysicalMemStructsFromEfi(&physicalMemTree,
+                                                 &physicalMemMap,
+                                                 pMemoryMapBuffer,
+                                                 memoryMapSize,
+                                                 memoryDescriptorSize,
+                                                 memoryDescriptorVersion,
+                                                 pPhysicalMemData,
+                                                 &physMemReq))
         return EFI_OUT_OF_RESOURCES;
-
-
-    // TODO: create physical mem tree
     
 
 
@@ -358,16 +337,14 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         DexprOS_ShellPuts(&g_shell, "\n");
     }
 
-    DexprOS_ShellPuts(&g_shell, "\nMemory map address: ");
-    testDisplayUint64Hex((uint64_t)pPhysicalMemMapMemory);
+    DexprOS_ShellPuts(&g_shell, "\nPhysical memory management structs address: ");
+    testDisplayUint64Hex((uint64_t)pPhysicalMemData);
+    DexprOS_ShellPuts(&g_shell, ", size: ");
+    testDisplayUint64Hex((uint64_t)physMemReq.bufferSize);
     DexprOS_ShellPuts(&g_shell, "\nNum memory map range entries: ");
     testDisplayUint64Hex(physicalMemMap.numEntries);
     DexprOS_ShellPuts(&g_shell, ", size: ");
     testDisplayUint64Hex(physicalMemMap.numEntries * sizeof(DexprOS_PhysicalMemoryRange));
-    DexprOS_ShellPuts(&g_shell, "\nMemory tree buffer address:");
-    testDisplayUint64Hex((uint64_t)pPhysicalMemTreeMemory);
-    DexprOS_ShellPuts(&g_shell, ", size: ");
-    testDisplayUint64Hex(memTreeSize);
 
 
 

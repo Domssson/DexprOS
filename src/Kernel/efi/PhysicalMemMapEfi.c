@@ -1,6 +1,7 @@
 #include "DexprOS/Kernel/efi/PhysicalMemMapEfi.h"
 
 #include "DexprOS/Kernel/efi/EfiMemMapIteration.h"
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
 
 
 static void CountEfiMemoryRanges(DexprOS_PhysicalMemoryAddress physicalAddress,
@@ -18,10 +19,12 @@ static void CountEfiMemoryRanges(DexprOS_PhysicalMemoryAddress physicalAddress,
     (void)memFlags;
 }
 
-size_t DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
-                                            UINTN memoryMapSize,
-                                            UINTN memoryDescriptorSize,
-                                            UINTN memoryDescriptorVersion)
+void DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
+                                          UINTN memoryMapSize,
+                                          UINTN memoryDescriptorSize,
+                                          UINTN memoryDescriptorVersion,
+                                          size_t* pOutBufferSize,
+                                          size_t* pOutBufferAlignment)
 {
     size_t numEntries = 0;
 
@@ -32,9 +35,8 @@ size_t DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
                              CountEfiMemoryRanges,
                              (void*)&numEntries);
 
-    size_t totalSize = numEntries * sizeof(DexprOS_PhysicalMemoryRange);
-
-    return totalSize;
+    *pOutBufferSize = numEntries * sizeof(DexprOS_PhysicalMemoryRange);
+    *pOutBufferAlignment = DEXPROS_FUNDAMENTAL_ALIGNMENT;
 }
 
 

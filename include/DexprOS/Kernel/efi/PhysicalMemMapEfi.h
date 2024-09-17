@@ -14,12 +14,14 @@ extern "C"
 #endif
 
 
-// Returns the required buffer size needed to create a physical memory map
-// in DexprOS's format in it.
-size_t DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
-                                            UINTN memoryMapSize,
-                                            UINTN memoryDescriptorSize,
-                                            UINTN memoryDescriptorVersion);
+// Sets the required size and alignment of the buffer needed to create the new
+// memory map
+void DexprOS_GetPhysicalMemMapSizeFromEfi(const void* pUefiMemoryMap,
+                                          UINTN memoryMapSize,
+                                          UINTN memoryDescriptorSize,
+                                          UINTN memoryDescriptorVersion,
+                                          size_t* pOutBufferSize,
+                                          size_t* pOutBufferAlignment);
 
 
 bool DexprOS_CreatePhysicalMemMapFromEfi(DexprOS_PhysicalMemMap* pResult,
