@@ -47,21 +47,26 @@ static void CalcTreeEntryElements(DexprOS_PhysicalMemoryAddress physicalAddress,
     DexprOS_PhysMemTreeEfiSizeData* pSizeData = (DexprOS_PhysMemTreeEfiSizeData*)pUserData;
     pSizeData->numTreeEntries += 1;
 
-    const size_t numPages = rangeSize / DEXPROS_PAGE_SIZE;
-
-    size_t numBlocks = numPages;
+    
+    size_t blockSize = DEXPROS_PHYSICAL_PAGE_SIZE;
+    DexprOS_PhysicalMemoryAddress minMappedAddress = physicalAddress;
+    DexprOS_PhysicalMemoryAddress maxMappedAddress = physicalAddress + rangeSize;
 
     for (;;)
     {
         pSizeData->numTreeLevelStructs += 1;
-        
+
+        minMappedAddress = (minMappedAddress / blockSize) * blockSize;
+        maxMappedAddress = ((maxMappedAddress + blockSize - 1) / blockSize) * blockSize;
+
+        size_t numBlocks = (maxMappedAddress - minMappedAddress) / blockSize;
         if (numBlocks > sizeof(uint8_t*))
             pSizeData->totalBlocksSize += numBlocks;
 
         if (numBlocks <= 1)
             return;
 
-        numBlocks = (numBlocks + 1) / 2;
+        blockSize *= 2;
     }
 
 
@@ -114,7 +119,6 @@ DexprOS_GetPhysicalMemTreeSizeFromEfi(const void* pUefiMemoryMap,
 }
 
 
-
 typedef struct DexprOS_PhysMemTreeCreateData
 {
     void* pBuffer;
@@ -149,55 +153,77 @@ static bool CreateTreeLevelBlocks(PhysMemTreeCreateData* pCreateData,
     }
     else
     {
-        for (size_t i = 0; i < sizeof(pLevel->blocks.inPlaceBlocks); ++i)
-            pLevel->blocks.inPlaceBlocks[i] = 0;
+        memset(pLevel->blocks.inPlaceBlocks, 0, sizeof(pLevel->blocks.inPlaceBlocks));
     }
 
     return true;
 }
 
+
 static bool CreateTreeLevels(PhysMemTreeCreateData* pCreateData,
                              DexprOS_PhysicalMemTreeEntry* pEntry)
 {
-    size_t numBlocks = pEntry->numPages;
+    size_t blockSize = DEXPROS_PHYSICAL_PAGE_SIZE;
+    DexprOS_PhysicalMemoryAddress minMappedAddress = pEntry->startAddress;
+    DexprOS_PhysicalMemoryAddress maxMappedAddress = pEntry->endAddress;
 
     // Calculate number of levels
+
     size_t numLevels = 0;
+
     for (;;)
     {
         numLevels += 1;
 
+        minMappedAddress = (minMappedAddress / blockSize) * blockSize;
+        maxMappedAddress = ((maxMappedAddress + blockSize - 1) / blockSize) * blockSize;
+
+        size_t numBlocks = (maxMappedAddress - minMappedAddress) / blockSize;
+
         if (numBlocks <= 1)
             break;
 
-        numBlocks = (numBlocks + 1) / 2;
+        blockSize *= 2;
     }
+
+
     pEntry->numTreeLevels = numLevels;
     pCreateData->treeLevelStructIndex += numLevels;
 
     if (pCreateData->treeLevelStructIndex > pCreateData->pSizeData->numTreeLevelStructs)
         return false;
 
-
-    // Calculate number of blocks for each level
-
-    numBlocks = pEntry->numPages;
+    return true;
+}
 
 
-    for (size_t i = 0; i < numLevels; ++i)
+static bool FillTreeLevelStructs(PhysMemTreeCreateData* pCreateData,
+                                 DexprOS_PhysicalMemTreeEntry* pEntry)
+{
+    // Fill level structs
+    size_t blockSize = DEXPROS_PHYSICAL_PAGE_SIZE;
+    DexprOS_PhysicalMemoryAddress minMappedAddress = pEntry->startAddress;
+    DexprOS_PhysicalMemoryAddress maxMappedAddress = pEntry->endAddress;
+
+    for (size_t i = 0; i < pEntry->numTreeLevels; ++i)
     {
-        size_t iLevel = numLevels - i - 1;
+        minMappedAddress = (minMappedAddress / blockSize) * blockSize;
+        maxMappedAddress = ((maxMappedAddress + blockSize - 1) / blockSize) * blockSize;
+
+        size_t iLevel = pEntry->numTreeLevels - i - 1;
 
         DexprOS_PhysicalMemTreeLevel* pLevel = &pEntry->pTreeLevels[iLevel];
-        pLevel->numBlocks = numBlocks;
+        pLevel->startMappedAddress = minMappedAddress;
+        pLevel->blockSize = blockSize;
+        pLevel->numBlocks = (maxMappedAddress - minMappedAddress) / blockSize;
 
-        numBlocks = (numBlocks + 1) / 2;
+        blockSize *= 2;
     }
 
-
+    
     // Create blocks inside levels
 
-    for (size_t i = 0; i < numLevels; ++i)
+    for (size_t i = 0; i < pEntry->numTreeLevels; ++i)
     {
         DexprOS_PhysicalMemTreeLevel* pLevel = &pEntry->pTreeLevels[i];
 
@@ -241,17 +267,17 @@ static void CreateTreeForMemoryRange(DexprOS_PhysicalMemoryAddress physicalAddre
     pEntry->flags = memFlags;
     pEntry->startAddress = physicalAddress;
     pEntry->endAddress = physicalAddress + rangeSize;
-    pEntry->numPages = rangeSize / DEXPROS_PAGE_SIZE;
+    pEntry->numPages = rangeSize / DEXPROS_PHYSICAL_PAGE_SIZE;
     pEntry->numTreeLevels = 0;
     pEntry->pTreeLevels = &pCreateData->pLevels[pCreateData->treeLevelStructIndex];
     pEntry->pNextEntry = NULL;
 
 
     if (!CreateTreeLevels(pCreateData, pEntry))
-    {
         pCreateData->success = false;
-        return;
-    }
+
+    if (!FillTreeLevelStructs(pCreateData, pEntry))
+        pCreateData->success = false;
 }
 
 
@@ -291,69 +317,62 @@ bool DexprOS_CreatePhysicalMemTreeFromEfi(DexprOS_PhysicalMemTree* pResult,
 }
 
 
-
 static void SetAllTreePagesAvailable(const DexprOS_PhysicalMemTree* pTree)
 {
     DexprOS_PhysicalMemTreeEntry* pEntry = pTree->pFirstEntry;
 
     while (pEntry != NULL)
     {
-        size_t iLastLevel = pEntry->numTreeLevels - 1;
-        DexprOS_PhysicalMemTreeLevel* pLevel = &pEntry->pTreeLevels[iLastLevel];
+        DexprOS_PhysicalMemTreeLevel* pLastLevel = &pEntry->pTreeLevels[pEntry->numTreeLevels - 1];
 
-        size_t numBlocks = pLevel->numBlocks;
+        uint8_t* pBlocks;
 
-        uint8_t* pBlocks = (numBlocks > sizeof(pLevel->blocks.inPlaceBlocks) ?
-                            pLevel->blocks.pBlocks : pLevel->blocks.inPlaceBlocks);
+        if (pLastLevel->numBlocks > sizeof(pLastLevel->blocks.inPlaceBlocks))
+            pBlocks = pLastLevel->blocks.pBlocks;
+        else
+            pBlocks = pLastLevel->blocks.inPlaceBlocks;
 
-        memset(pBlocks, DEXPROS_PHYS_MEM_PAGE_AVAILABLE_BIT, numBlocks);
-
+        memset(pBlocks, DEXPROS_PHYS_MEM_PAGE_AVAILABLE_BIT, pLastLevel->numBlocks);
 
         pEntry = pEntry->pNextEntry;
     }
 }
 
 
-static void MarkTreeEntryPagesUsed(const DexprOS_PhysicalMemTreeEntry* pEntry,
-                                   size_t firstPageIndex,
-                                   size_t numPages)
+static void MarkUsedTreePages(const DexprOS_PhysicalMemTree* pTree,
+                              DexprOS_PhysicalMemoryAddress regionStartAddress,
+                              DexprOS_PhysicalMemorySize regionSize)
 {
-    size_t iLastLevel = pEntry->numTreeLevels - 1;
-    DexprOS_PhysicalMemTreeLevel* pLevel = &pEntry->pTreeLevels[iLastLevel];
-
-    size_t numBlocks = pLevel->numBlocks;
-
-    uint8_t* pBlocks = (numBlocks > sizeof(pLevel->blocks.inPlaceBlocks) ?
-                        pLevel->blocks.pBlocks : pLevel->blocks.inPlaceBlocks);
-
-    memset(pBlocks + firstPageIndex, DEXPROS_PHYS_MEM_PAGE_UNAVAILABLE, numPages);
-}
-
-static void MarkTreeRegionPagesUsed(const DexprOS_PhysicalMemTree* pTree,
-                                    DexprOS_PhysicalMemoryAddress regionStartAddress,
-                                    DexprOS_PhysicalMemorySize regionSize)
-{
-    DexprOS_PhysicalMemoryAddress startAddress = (regionStartAddress / DEXPROS_PAGE_SIZE) *
-                                                 DEXPROS_PAGE_SIZE;
+    DexprOS_PhysicalMemoryAddress startAddress = (regionStartAddress / DEXPROS_PHYSICAL_PAGE_SIZE) *
+                                                 DEXPROS_PHYSICAL_PAGE_SIZE;
     DexprOS_PhysicalMemoryAddress endAddress = DEXPROS_ALIGN(regionStartAddress + regionSize,
-                                                             DEXPROS_PAGE_SIZE);
-
+                                                             DEXPROS_PHYSICAL_PAGE_SIZE);
 
     DexprOS_PhysicalMemTreeEntry* pEntry = pTree->pFirstEntry;
 
     while (pEntry != NULL)
     {
-        if (startAddress <= pEntry->endAddress &&
-            endAddress >= pEntry->startAddress)
+        if (startAddress < pEntry->endAddress &&
+            endAddress > pEntry->startAddress)
         {
-            DexprOS_PhysicalMemoryAddress entryStart = (startAddress > pEntry->startAddress ?
-                                                        startAddress : pEntry->startAddress);
-            DexprOS_PhysicalMemoryAddress entryEnd = (endAddress < pEntry->endAddress ?
-                                                      endAddress : pEntry->endAddress);
-            size_t firstPageIndex = (entryStart - pEntry->startAddress) / DEXPROS_PAGE_SIZE;
-            size_t numPages = (entryEnd - entryStart) / DEXPROS_PAGE_SIZE;
+            DexprOS_PhysicalMemTreeLevel* pLastLevel = &pEntry->pTreeLevels[pEntry->numTreeLevels - 1];
+            DexprOS_PhysicalMemoryAddress minMapAddress = pLastLevel->startMappedAddress;
+            DexprOS_PhysicalMemoryAddress maxMapAddress = pLastLevel->startMappedAddress + pLastLevel->numBlocks * pLastLevel->blockSize;
 
-            MarkTreeEntryPagesUsed(pEntry, firstPageIndex, numPages);
+            minMapAddress = (startAddress > minMapAddress ? startAddress : minMapAddress);
+            maxMapAddress = (endAddress < maxMapAddress ? endAddress : maxMapAddress);
+
+            size_t iFirstBlock = (minMapAddress - pLastLevel->startMappedAddress) / pLastLevel->blockSize;
+            size_t numMarkBlocks = (maxMapAddress - minMapAddress) / pLastLevel->blockSize;
+
+            uint8_t* pBlocks;
+
+            if (pLastLevel->numBlocks > sizeof(pLastLevel->blocks.inPlaceBlocks))
+                pBlocks = pLastLevel->blocks.pBlocks;
+            else
+                pBlocks = pLastLevel->blocks.inPlaceBlocks;
+
+            memset(pBlocks + iFirstBlock, DEXPROS_PHYS_MEM_PAGE_UNAVAILABLE, numMarkBlocks);
         }
 
         pEntry = pEntry->pNextEntry;
@@ -361,8 +380,7 @@ static void MarkTreeRegionPagesUsed(const DexprOS_PhysicalMemTree* pTree,
 }
 
 
-static void FillTreeLevelAccelBlocks(const DexprOS_PhysicalMemTreeEntry* pEntry,
-                                     size_t iLevel)
+static void FillTreeLevelAccelBlocks(DexprOS_PhysicalMemTreeEntry* pEntry, size_t iLevel)
 {
     DexprOS_PhysicalMemTreeLevel* pLevel = &pEntry->pTreeLevels[iLevel];
     DexprOS_PhysicalMemTreeLevel* pNextLevel = &pEntry->pTreeLevels[iLevel + 1];
@@ -375,6 +393,11 @@ static void FillTreeLevelAccelBlocks(const DexprOS_PhysicalMemTreeEntry* pEntry,
 
     uint8_t* pNextBlocks = (numNextBlocks > sizeof(pNextLevel->blocks.inPlaceBlocks) ?
                             pNextLevel->blocks.pBlocks : pNextLevel->blocks.inPlaceBlocks);
+    
+    
+    size_t minNextOffset = (pNextLevel->startMappedAddress - pLevel->startMappedAddress) /
+                            pNextLevel->blockSize;
+    size_t maxNextOffset = minNextOffset + numNextBlocks;
 
 
     for (size_t i = 0; i < numBlocks; ++i)
@@ -382,12 +405,12 @@ static void FillTreeLevelAccelBlocks(const DexprOS_PhysicalMemTreeEntry* pEntry,
         size_t iNext0 = i * 2;
         size_t iNext1 = i * 2 + 1;
 
-        uint8_t state0 = 0;
-        uint8_t state1 = 0;
+        uint8_t state0 = 0, state1 = 0;
 
-        state0 = pNextBlocks[iNext0];
-        if (iNext1 < numNextBlocks)
-            state1 = pNextBlocks[iNext1];
+        if (iNext0 >= minNextOffset && iNext0 < maxNextOffset)
+            state0 = pNextBlocks[iNext0 - minNextOffset];
+        if (iNext1 >= minNextOffset && iNext1 < maxNextOffset)
+            state1 = pNextBlocks[iNext1 - minNextOffset];
 
 
         uint8_t result = ((state0 >> 1) + (state1 >> 1));
@@ -398,6 +421,7 @@ static void FillTreeLevelAccelBlocks(const DexprOS_PhysicalMemTreeEntry* pEntry,
         pBlocks[i] = result;
     }
 }
+
 
 static void FillTreeAccelBlocks(const DexprOS_PhysicalMemTree* pTree)
 {
@@ -412,10 +436,10 @@ static void FillTreeAccelBlocks(const DexprOS_PhysicalMemTree* pTree)
             FillTreeLevelAccelBlocks(pEntry, iLevel);
         }
 
-
         pEntry = pEntry->pNextEntry;
     }
 }
+
 
 void DexprOS_MarkPhysicalMemTreeRegionsFromEfi(const DexprOS_PhysicalMemTree* pTree,
                                                const void* pUefiMemoryMap,
@@ -438,18 +462,19 @@ void DexprOS_MarkPhysicalMemTreeRegionsFromEfi(const DexprOS_PhysicalMemTree* pT
             DexprOS_PhysicalMemoryAddress startAddress = pMemoryDesc->PhysicalStart;
             DexprOS_PhysicalMemorySize size = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
 
-            MarkTreeRegionPagesUsed(pTree,
-                                    startAddress,
-                                    size);
+            MarkUsedTreePages(pTree,
+                              startAddress,
+                              size);
         }
     }
 
     for (size_t i = 0; i < numOtherRegionsInUse; ++i)
     {
-        MarkTreeRegionPagesUsed(pTree,
-                                pOtherRegionsInUse[i],
-                                pOtherRegionsSizes[i]);
+        MarkUsedTreePages(pTree,
+                          pOtherRegionsInUse[i],
+                          pOtherRegionsSizes[i]);
     }
+
 
     FillTreeAccelBlocks(pTree);
 

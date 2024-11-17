@@ -37,6 +37,8 @@
 
 typedef struct DexprOS_PhysicalMemTreeLevel
 {
+    DexprOS_PhysicalMemoryAddress startMappedAddress;
+    size_t blockSize;
     size_t numBlocks;
 
     union
