@@ -18,8 +18,13 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/KernelPanic.c
                             src/Kernel/KernelAssert.c
                             src/Kernel/KeyboardInput.c
+                            src/Kernel/Memory/InitialMemMap.c
+                            src/Kernel/Memory/MemoryDef.c
                             src/Kernel/Memory/PhysicalMemMap.c
+                            src/Kernel/Memory/PhysicalMemMapGen.c
                             src/Kernel/Memory/PhysicalMemTree.c
+                            src/Kernel/Memory/PhysicalMemTreeGen.c
+                            src/Kernel/Memory/PhysicalMemStructsGen.c
                             src/Kernel/x86_64/InlineAsm.c
                             src/Kernel/x86_64/CpuidRetrieve.S
                             src/Kernel/x86_64/CpuFeatures.c
@@ -36,10 +41,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/IdtCreator.c
                             src/Kernel/x86_64/SyscallHandler.S
                             src/Kernel/x86_64/PageMapSwitching.S
-                            src/Kernel/efi/EfiMemMapIteration.c
-                            src/Kernel/efi/PhysicalMemMapEfi.c
-                            src/Kernel/efi/PhysicalMemStructsGenEfi.c
-                            src/Kernel/efi/PhysicalMemTreeGenEfi.c
+                            src/Kernel/efi/InitialMemMapGenEfi.c
                             src/Kernel/kstdlib/string.c
                             src/Drivers/Graphics/GraphicsDriver.c
                             src/Drivers/Graphics/CpuGraphicsDriver.c
@@ -59,10 +61,14 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/Boot/x86_64-efi/EndBootPhase.h
                            include/DexprOS/Kernel/KernelPanic.h
                            include/DexprOS/Kernel/KernelAssert.h
                            include/DexprOS/Kernel/KeyboardInput.h
+                           include/DexprOS/Kernel/Memory/InitialMemMap.h
                            include/DexprOS/Kernel/Memory/MemoryDef.h
                            include/DexprOS/Kernel/Memory/Paging.h
                            include/DexprOS/Kernel/Memory/PhysicalMemMap.h
+                           include/DexprOS/Kernel/Memory/PhysicalMemMapGen.h
                            include/DexprOS/Kernel/Memory/PhysicalMemTree.h
+                           include/DexprOS/Kernel/Memory/PhysicalMemTreeGen.h
+                           include/DexprOS/Kernel/Memory/PhysicalMemStructsGen.h
                            include/DexprOS/Kernel/x86_64/InlineAsm.h
                            include/DexprOS/Kernel/x86_64/CpuidRetrieve.h
                            include/DexprOS/Kernel/x86_64/CpuFeatures.h
@@ -79,10 +85,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/Boot/x86_64-efi/EndBootPhase.h
                            include/DexprOS/Kernel/x86_64/TaskStateSegment.h
                            include/DexprOS/Kernel/x86_64/PageMapSwitching.h
                            include/DexprOS/Kernel/kstdlib/string.h
-                           include/DexprOS/Kernel/efi/EfiMemMapIteration.h
-                           include/DexprOS/Kernel/efi/PhysicalMemMapEfi.h
-                           include/DexprOS/Kernel/efi/PhysicalMemStructsGenEfi.h
-                           include/DexprOS/Kernel/efi/PhysicalMemTreeGenEfi.h
+                           include/DexprOS/Kernel/efi/InitialMemMapGenEfi.h
                            include/DexprOS/Drivers/Graphics/GraphicsDriver.h
                            include/DexprOS/Drivers/Graphics/CpuGraphicsDriver.h
                            include/DexprOS/Drivers/PICDriver.h

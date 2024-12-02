@@ -1,6 +1,5 @@
-#include "DexprOS/Kernel/efi/PhysicalMemTreeGenEfi.h"
+#include "DexprOS/Kernel/Memory/PhysicalMemTreeGen.h"
 
-#include "DexprOS/Kernel/efi/EfiMemMapIteration.h"
 #include "DexprOS/Kernel/Memory/Paging.h"
 #include "DexprOS/Kernel/Memory/MemoryDef.h"
 #include "DexprOS/Kernel/kstdlib/string.h"
@@ -44,7 +43,7 @@ static void CalcTreeEntryElements(DexprOS_PhysicalMemoryAddress physicalAddress,
     if (!ShouldCreateTreeForType(memType))
         return;
 
-    DexprOS_PhysMemTreeEfiSizeData* pSizeData = (DexprOS_PhysMemTreeEfiSizeData*)pUserData;
+    DexprOS_PhysMemTreeSizeData* pSizeData = (DexprOS_PhysMemTreeSizeData*)pUserData;
     pSizeData->numTreeEntries += 1;
 
     
@@ -75,13 +74,10 @@ static void CalcTreeEntryElements(DexprOS_PhysicalMemoryAddress physicalAddress,
 }
 
 
-DexprOS_PhysMemTreeEfiSizeData
-DexprOS_GetPhysicalMemTreeSizeFromEfi(const void* pUefiMemoryMap,
-                                      UINTN memoryMapSize,
-                                      UINTN memoryDescriptorSize,
-                                      UINTN memoryDescriptorVersion)
+DexprOS_PhysMemTreeSizeData
+DexprOS_GetPhysicalMemTreeSize(const DexprOS_InitialMemMap* pInitialMap)
 {
-    DexprOS_PhysMemTreeEfiSizeData sizeData;
+    DexprOS_PhysMemTreeSizeData sizeData;
     sizeData.bufferAlignment = DEXPROS_FUNDAMENTAL_ALIGNMENT;
     sizeData.bufferSize = 0;
     sizeData.treeEntriesOffset = 0;
@@ -91,12 +87,9 @@ DexprOS_GetPhysicalMemTreeSizeFromEfi(const void* pUefiMemoryMap,
     sizeData.blocksOffset = 0;
     sizeData.totalBlocksSize = 0;
 
-    DexprOS_IterateEfiMemMap(pUefiMemoryMap,
-                             memoryMapSize,
-                             memoryDescriptorSize,
-                             memoryDescriptorVersion,
-                             CalcTreeEntryElements,
-                             (void*)&sizeData);
+    DexprOS_IterateInitialMemMapCombinedPhysRanges(pInitialMap,
+                                                   CalcTreeEntryElements,
+                                                   (void*)&sizeData);
 
     size_t bufferSize = 0;
 
@@ -122,7 +115,7 @@ DexprOS_GetPhysicalMemTreeSizeFromEfi(const void* pUefiMemoryMap,
 typedef struct DexprOS_PhysMemTreeCreateData
 {
     void* pBuffer;
-    const DexprOS_PhysMemTreeEfiSizeData* pSizeData;
+    const DexprOS_PhysMemTreeSizeData* pSizeData;
 
     DexprOS_PhysicalMemTreeEntry* pEntries;
     DexprOS_PhysicalMemTreeLevel* pLevels;
@@ -281,13 +274,10 @@ static void CreateTreeForMemoryRange(DexprOS_PhysicalMemoryAddress physicalAddre
 }
 
 
-bool DexprOS_CreatePhysicalMemTreeFromEfi(DexprOS_PhysicalMemTree* pResult,
-                                          const void* pUefiMemoryMap,
-                                          UINTN memoryMapSize,
-                                          UINTN memoryDescriptorSize,
-                                          UINTN memoryDescriptorVersion,
-                                          void* pBuffer,
-                                          const DexprOS_PhysMemTreeEfiSizeData* pSizeData)
+bool DexprOS_CreatePhysicalMemTree(DexprOS_PhysicalMemTree* pResult,
+                                   const DexprOS_InitialMemMap* pInitialMap,
+                                   void* pBuffer,
+                                   const DexprOS_PhysMemTreeSizeData* pSizeData)
 {
     PhysMemTreeCreateData createData;
     createData.pBuffer = pBuffer;
@@ -303,12 +293,9 @@ bool DexprOS_CreatePhysicalMemTreeFromEfi(DexprOS_PhysicalMemTree* pResult,
 
     createData.success = true;
 
-    DexprOS_IterateEfiMemMap(pUefiMemoryMap,
-                             memoryMapSize,
-                             memoryDescriptorSize,
-                             memoryDescriptorVersion,
-                             CreateTreeForMemoryRange,
-                             (void*)&createData);
+    DexprOS_IterateInitialMemMapCombinedPhysRanges(pInitialMap,
+                                                   CreateTreeForMemoryRange,
+                                                   (void*)&createData);
 
     pResult->pFirstEntry = createData.pEntries;
 
@@ -441,30 +428,45 @@ static void FillTreeAccelBlocks(const DexprOS_PhysicalMemTree* pTree)
 }
 
 
-void DexprOS_MarkPhysicalMemTreeRegionsFromEfi(const DexprOS_PhysicalMemTree* pTree,
-                                               const void* pUefiMemoryMap,
-                                               UINTN memoryMapSize,
-                                               UINTN memoryDescriptorSize,
-                                               UINTN memoryDescriptorVersion,
-                                               size_t numOtherRegionsInUse,
-                                               const DexprOS_PhysicalMemoryAddress* pOtherRegionsInUse,
-                                               const DexprOS_PhysicalMemorySize* pOtherRegionsSizes)
+void DexprOS_MarkPhysicalMemTreeRegions(const DexprOS_PhysicalMemTree* pTree,
+                                        const DexprOS_InitialMemMap* pInitialMap,
+                                        size_t numOtherRegionsInUse,
+                                        const DexprOS_PhysicalMemoryAddress* pOtherRegionsInUse,
+                                        const DexprOS_PhysicalMemorySize* pOtherRegionsSizes)
 {
     SetAllTreePagesAvailable(pTree);
 
-    // Mark efi loader code and data regions on the map because they're included
-    // in the OS's usable regions managed by the tree
-    for (UINTN memOffset = 0; memOffset < memoryMapSize; memOffset += memoryDescriptorSize)
-    {
-        const EFI_MEMORY_DESCRIPTOR* pMemoryDesc = (const EFI_MEMORY_DESCRIPTOR*)((char*)pUefiMemoryMap + memOffset);
-        if (pMemoryDesc->Type == EfiLoaderCode || pMemoryDesc->Type == EfiLoaderData)
-        {
-            DexprOS_PhysicalMemoryAddress startAddress = pMemoryDesc->PhysicalStart;
-            DexprOS_PhysicalMemorySize size = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE;
+    // Mark kernel, boot and initial map regions on the map because they're included
+    // in the OS's usable regions managed by the tree and are currently in use.
 
-            MarkUsedTreePages(pTree,
-                              startAddress,
-                              size);
+    for (size_t i = 0; i < pInitialMap->numEntries; ++i)
+    {
+        const DexprOS_InitialMemMapEntry* pEntry = &pInitialMap->pEntries[i];
+
+        if (!ShouldCreateTreeForType(pEntry->memoryType))
+            continue;
+
+        switch (pEntry->usage)
+        {
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_CODE:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_DATA:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_BOOT_CODE:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_BOOT_DATA:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_INITIAL_MEMMAP:
+            
+            {
+                DexprOS_PhysicalMemoryAddress startAddress = pEntry->physicalAddress;
+                DexprOS_PhysicalMemorySize size = pEntry->numPhysicalPages * DEXPROS_PHYSICAL_PAGE_SIZE;
+
+                MarkUsedTreePages(pTree,
+                                  startAddress,
+                                  size);
+            }
+            break;
+
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_NONE:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED:
+            break;
         }
     }
 
@@ -477,7 +479,5 @@ void DexprOS_MarkPhysicalMemTreeRegionsFromEfi(const DexprOS_PhysicalMemTree* pT
 
 
     FillTreeAccelBlocks(pTree);
-
-    (void)memoryDescriptorVersion;
 }
 

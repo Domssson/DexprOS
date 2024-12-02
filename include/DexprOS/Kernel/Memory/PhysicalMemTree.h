@@ -1,7 +1,7 @@
 #ifndef DEXPROS_KERNEL_MEMORY_PHYSICALMEMTREE_H_INCLUDED
 #define DEXPROS_KERNEL_MEMORY_PHYSICALMEMTREE_H_INCLUDED
 
-#include "DexprOS/Kernel/Memory/PhysicalMemMap.h"
+#include "MemoryDef.h"
 
 #include <stdint.h>
 #include <stddef.h>
