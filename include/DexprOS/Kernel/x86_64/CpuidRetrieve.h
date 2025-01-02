@@ -7,13 +7,9 @@
 extern "C"
 {
 #endif
-#include <cpuid.h>
 
 
-extern uint8_t DexprOS_GetCpuid_EAX1(uint32_t* pOutEax, uint32_t* pOutEbx, uint32_t* pOutEcx, uint32_t* pOutEdx);
-
-
-extern uint8_t DexprOS_GetCpuid_EAX7_ECX0(uint32_t* pOutEax, uint32_t* pOutEbx, uint32_t* pOutEcx, uint32_t* pOutEdx);
+extern void DexprOS_Cpuid(uint32_t* pEax, uint32_t* pOutEbx, uint32_t* pEcx, uint32_t* pOutEdx);
 
 
 #ifdef __cplusplus

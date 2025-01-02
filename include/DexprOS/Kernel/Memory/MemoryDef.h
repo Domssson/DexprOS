@@ -47,8 +47,8 @@ typedef enum DexprOS_PhysicalMemoryType
 } DexprOS_PhysicalMemoryType;
 
 
-// If this flag is set, the memory supports being configured as non-cachable
-// using paging
+// If this flag is set on a memory range, the memory region supports being
+// configured as non-cachable using paging
 #define DEXPROS_PHYSICAL_MEMORY_UC_BIT 0x1
 #define DEXPROS_PHYSICAL_MEMORY_WRITE_COMBINE_BIT 0x2
 #define DEXPROS_PHYSICAL_MEMORY_WRITE_THROUGH_BIT 0x4

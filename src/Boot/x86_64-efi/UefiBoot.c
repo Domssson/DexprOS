@@ -12,6 +12,7 @@
 #include "DexprOS/Kernel/x86_64/MemoryProtectionCpuSetup.h"
 #include "DexprOS/Kernel/x86_64/FloatingPointInit.h"
 #include "DexprOS/Kernel/x86_64/PageMapSwitching.h"
+#include "DexprOS/Kernel/x86_64/PagingSettings.h"
 #include "DexprOS/Drivers/Graphics/CpuGraphicsDriver.h"
 #include "DexprOS/Drivers/PICDriver.h"
 #include "DexprOS/Drivers/PS2ControllerDriver.h"
@@ -238,6 +239,11 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     
 
     DexprOS_EnableMemoryProtectionCpuFeatures();
+    // Fill global paging settings struct
+    g_DexprOS_PagingSettings.pagingMode = DEXPROS_PAGING_MODE_4_LEVEL;
+    if (DexprOS_CheckCpu5LevelPagingSupport() && DexprOS_Is5LevelPagingActive())
+        g_DexprOS_PagingSettings.pagingMode = DEXPROS_PAGING_MODE_5_LEVEL;
+    g_DexprOS_PagingSettings.noExecuteAvailable = DexprOS_CheckCpuHasNX();
 
 
     DexprOS_InitFloatingPointOperations();
@@ -377,7 +383,6 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     testDisplayUint64Hex(physicalMemMap.numEntries);
     DexprOS_ShellPuts(&g_shell, ", size: ");
     testDisplayUint64Hex(physicalMemMap.numEntries * sizeof(DexprOS_PhysicalMemoryRange));
-
 
 
     DexprOS_ShellPuts(&g_shell, "\n\n");

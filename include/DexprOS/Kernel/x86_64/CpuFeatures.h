@@ -23,6 +23,9 @@ bool DexprOS_CheckCpuHasXSAVE(void);
 bool DexprOS_CheckCpuHasAVX(void);
 
 
+bool DexprOS_CheckCpuHasNX(void);
+
+
 bool DexprOS_CheckCpu5LevelPagingSupport(void);
 
 
