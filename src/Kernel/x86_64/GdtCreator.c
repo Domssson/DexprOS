@@ -64,7 +64,7 @@ DexprOS_GeneralDescriptorTable DexprOS_CreateGDT(const uint64_t* pTSSAddresses,
     for (uint16_t i = 0; i < numTSSes && i < DEXPROS_X86_64_NUM_MAX_TSSes; ++i)
     {
         gdtTable.taskStateSegments[i].base = pTSSAddresses[i];
-        gdtTable.taskStateSegments[i].limit = pTSSSizes[i];
+        gdtTable.taskStateSegments[i].limit = pTSSSizes[i] - 1;
         gdtTable.taskStateSegments[i].accessByte = DEXPROS_GDT_ACCESS_AVAIBLE_TASK_STATE_SEGMENT_BIT |
                                                    DEXPROS_GDT_ACCESS_PRESENT_BIT;
         gdtTable.taskStateSegments[i].flags = 0;
@@ -113,7 +113,7 @@ void DexprOS_EncodeGDTSystemSegment(const DexprOS_GDTLongSystemSegmentDescriptor
     pOutEntries2[0] |= ((flags & 0xF) << 52);
     pOutEntries2[0] |= (((base >> 24) & 0xFF) << 56);
 
-    pOutEntries2[1] |= ((base >> 32) & 0xFFFF);
+    pOutEntries2[1] |= ((base >> 32) & 0xFFFFFFFF);
 }
 
 

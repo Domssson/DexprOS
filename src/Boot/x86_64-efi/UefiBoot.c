@@ -236,6 +236,8 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
                                       &memoryMapKey,
                                       &memoryDescriptorSize,
                                       &memoryDescriptorVersion);
+    if (EFI_ERROR(status))
+        return status;
     
 
     DexprOS_EnableMemoryProtectionCpuFeatures();
