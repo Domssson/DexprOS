@@ -65,7 +65,7 @@ typedef enum DexprOS_GDTAccessBits
     // segment.
     DEXPROS_GDT_ACCESS_LDT_SEGMENT_BIT = 0x2,
     // Determines whether the segment is an avaible Task State Segment.
-    DEXPROS_GDT_ACCESS_AVAIBLE_TASK_STATE_SEGMENT_BIT = 0x9,
+    DEXPROS_GDT_ACCESS_AVAILABLE_TASK_STATE_SEGMENT_BIT = 0x9,
     // Determines whether the segment is a busy Task State Segment.
     DEXPROS_GDT_ACCESS_BUSY_TASK_STATE_SEGMENT_BIT = 0xB,
     // Determines whether the segment is a memory segment and not a system one

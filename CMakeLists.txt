@@ -19,6 +19,7 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/KernelAssert.c
                             src/Kernel/KeyboardInput.c
                             src/Kernel/Memory/InitialMemMap.c
+                            src/Kernel/Memory/InitialLinearAllocator.c
                             src/Kernel/Memory/MemoryDef.c
                             src/Kernel/Memory/PhysicalMemMap.c
                             src/Kernel/Memory/PhysicalMemMapGen.c
@@ -39,6 +40,10 @@ set(DEXPROS_KERNEL_SOURCES src/Boot/x86_64-efi/UefiBoot.c
                             src/Kernel/x86_64/Interrupts.S
                             src/Kernel/x86_64/InterruptHandlers.c
                             src/Kernel/x86_64/IdtCreator.c
+                            src/Kernel/x86_64/KernelInit.c
+                            src/Kernel/x86_64/KernelStartInfo.c
+                            src/Kernel/x86_64/StartupVirtMapCreator.c
+                            src/Kernel/x86_64/StartupVirtMapSwitch.S
                             src/Kernel/x86_64/SyscallHandler.S
                             src/Kernel/x86_64/PageMapSwitching.S
                             src/Kernel/x86_64/PagingSettings.c
@@ -63,6 +68,7 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/Boot/x86_64-efi/EndBootPhase.h
                            include/DexprOS/Kernel/KernelAssert.h
                            include/DexprOS/Kernel/KeyboardInput.h
                            include/DexprOS/Kernel/Memory/InitialMemMap.h
+                           include/DexprOS/Kernel/Memory/InitialLinearAllocator.h
                            include/DexprOS/Kernel/Memory/MemoryDef.h
                            include/DexprOS/Kernel/Memory/Paging.h
                            include/DexprOS/Kernel/Memory/PhysicalMemMap.h
@@ -81,7 +87,11 @@ set(DEXPROS_KERNEL_HEADERS include/DexprOS/Boot/x86_64-efi/EndBootPhase.h
                            include/DexprOS/Kernel/x86_64/IdtCreator.h
                            include/DexprOS/Kernel/x86_64/InterruptHandlers.h
                            include/DexprOS/Kernel/x86_64/Interrupts.h
+                           include/DexprOS/Kernel/x86_64/KernelInit.h
                            include/DexprOS/Kernel/x86_64/KernelPanicHalt.h
+                           include/DexprOS/Kernel/x86_64/KernelStartInfo.h
+                           include/DexprOS/Kernel/x86_64/StartupVirtMapCreator.h
+                           include/DexprOS/Kernel/x86_64/StartupVirtMapSwitch.h
                            include/DexprOS/Kernel/x86_64/SyscallHandler.h
                            include/DexprOS/Kernel/x86_64/TaskStateSegment.h
                            include/DexprOS/Kernel/x86_64/PageMapSwitching.h

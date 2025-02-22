@@ -6,48 +6,6 @@
 #include <stddef.h>
 
 
-typedef enum DexprOS_CpuGrFramebufferFormat
-{
-    DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8,
-    DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8,
-    DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_Max
-} DexprOS_CpuGrFramebufferFormat;
-
-typedef enum DexprOS_CpuGrSwapBufferOp
-{
-    DEXPROS_CPU_GR_SWAP_BUFFER_NONE_OP = 0,
-    DEXPROS_CPU_GR_SWAP_BUFFER_FULL_OP,
-    DEXPROS_CPU_GR_SWAP_BUFFER_REGION_OP
-} DexprOS_CpuGrSwapBufferOp;
-
-typedef struct DexprOS_CpuGrSwapBufferInfo
-{
-    DexprOS_CpuGrSwapBufferOp swapOp;
-    uint32_t regionStartX;
-    uint32_t regionStartY;
-    uint32_t regionWidth;
-    uint32_t regionHeight;
-} DexprOS_CpuGrSwapBufferInfo;
-
-
-typedef struct DexprOS_CpuGrGraphicsDrvData
-{
-    uint32_t presentationWidth;
-    uint32_t presentationHeight;
-    uint32_t presentationPixelBytes;
-    uint32_t presentationPixelStride;
-
-    void* pMainFramebufferMemory;
-    size_t mainFramebufferSize;
-
-    void* pRenderFramebufferMemory;
-
-    DexprOS_CpuGrFramebufferFormat framebufferFormat;
-
-    DexprOS_CpuGrSwapBufferInfo swapBufferInfo;
-} DexprOS_CpuGrGraphicsDrvData;
-
-
 
 static void CpuGrMarkScreenRegionForSwapping(DexprOS_CpuGrGraphicsDrvData* pDrv,
                                              uint32_t x,
@@ -205,13 +163,13 @@ static void CpuGrGraphicsClearScreen(void* pDrvData, DexprOS_GrGraphicsColor col
 
     switch (pData->framebufferFormat)
     {
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
         CpuGrClearScreenRGB(pData, color.r, color.g, color.b);
         return;
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
         CpuGrClearScreenBGR(pData, color.r, color.g, color.b);
         return;
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_Max:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_Max:
         return;
     }
 }
@@ -326,19 +284,19 @@ static void CpuGrGraphicsClearScreenRegions(void* pDrvData,
 
         switch (pDrv->framebufferFormat)
         {
-        case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
+        case DEXPROS_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
             CpuGrClearScreenRegionRGB(pDrv,
                                         startX, startY,
                                         width, height,
                                         color.r, color.g, color.b);
             break;
-        case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
+        case DEXPROS_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
             CpuGrClearScreenRegionBGR(pDrv,
                                         startX, startY,
                                         width, height,
                                         color.r, color.g, color.b);
             break;
-        case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_Max:
+        case DEXPROS_GR_FRAMEBUFFER_FORMAT_Max:
             break;
         }
     }
@@ -537,7 +495,7 @@ static void CpuGrGraphicsBlitImageToFramebuffer(void* pDrvData,
 
     switch (pDrv->framebufferFormat)
     {
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8:
         
         switch (imageFormat)
         {
@@ -564,7 +522,7 @@ static void CpuGrGraphicsBlitImageToFramebuffer(void* pDrvData,
         }
         return;
 
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8:
         switch (imageFormat)
         {
         case DEXPROS_GR_IMAGE_FORMAT_RGB8:
@@ -590,69 +548,56 @@ static void CpuGrGraphicsBlitImageToFramebuffer(void* pDrvData,
         }
         return;
     
-    case DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_Max:
+    case DEXPROS_GR_FRAMEBUFFER_FORMAT_Max:
         return;
     }
 }
 
 
+inline static DexprOS_VirtualMemoryAddress CpuGrDrvRellocPointer(DexprOS_VirtualMemoryAddress address,
+                                                                 DexprOS_VirtualMemoryAddress rellocOffset)
+{
+    if (address > rellocOffset || address == 0)
+        return address;
+    return address + rellocOffset;
+}
+
 
 DexprOS_CpuGraphicsDrvInitError DexprOS_InitCpuGraphicsDriver(DexprOS_GraphicsDriver* pDriver,
-                                                              EFI_GRAPHICS_OUTPUT_PROTOCOL* pGop,
-                                                              EFI_BOOT_SERVICES* pBootServices)
+                                                              DexprOS_CpuGrGraphicsDrvData* pDrvData,
+                                                              const DexprOS_StartupFramebufferInfo* pFbInfo,
+                                                              DexprOS_VirtualMemoryAddress rellocOffset)
 {
-    if (pGop->Mode->Info->PixelFormat == PixelBltOnly ||
-        pGop->Mode->Info->PixelFormat == PixelBitMask)
+    if (pFbInfo->framebufferFormat == DEXPROS_GR_FRAMEBUFFER_FORMAT_Max)
         return DEXPROS_CPU_GRAPHICS_DRV_INIT_UNSUPPORTED_FORMAT;
-
-
-    EFI_STATUS status = 0;
     
-    void* pDriverMemory = NULL;
-    void* pBackbufferMemory = NULL;
-    
-    status = pBootServices->AllocatePool(EfiLoaderData, sizeof(DexprOS_CpuGrGraphicsDrvData), &pDriverMemory);
-    if (EFI_ERROR(status))
-        return DEXPROS_CPU_GRAPHICS_DRV_INIT_MEMORY_ERROR;
+    pDrvData->presentationWidth = pFbInfo->presentationWidth;
+    pDrvData->presentationHeight = pFbInfo->presentationHeight;
+    pDrvData->presentationPixelBytes = pFbInfo->presentationPixelBytes;
+    pDrvData->presentationPixelStride = pFbInfo->presentationPixelStride;
+    pDrvData->pMainFramebufferMemory = (void*)pFbInfo->framebufferVirtAddr;
+    pDrvData->mainFramebufferSize = pFbInfo->mainFramebufferSize;
+    pDrvData->pRenderFramebufferMemory = pFbInfo->pRenderBackBufferMemory;
+    pDrvData->framebufferFormat = pFbInfo->framebufferFormat;
+    pDrvData->swapBufferInfo.swapOp = DEXPROS_CPU_GR_SWAP_BUFFER_NONE_OP;
+    pDrvData->swapBufferInfo.regionStartX = 0;
+    pDrvData->swapBufferInfo.regionStartY = 0;
+    pDrvData->swapBufferInfo.regionWidth = 0;
+    pDrvData->swapBufferInfo.regionHeight = 0;
 
-
-    status = pBootServices->AllocatePool(EfiLoaderData, pGop->Mode->FrameBufferSize, &pBackbufferMemory);
-    if (EFI_ERROR(status)){
-        pBootServices->FreePool(pDriverMemory);
-        return DEXPROS_CPU_GRAPHICS_DRV_INIT_MEMORY_ERROR;
-    }
-
-
-    DexprOS_CpuGrGraphicsDrvData* pDriverData = (DexprOS_CpuGrGraphicsDrvData*)pDriverMemory;
-    pDriverData->presentationWidth = pGop->Mode->Info->HorizontalResolution;
-    pDriverData->presentationHeight = pGop->Mode->Info->VerticalResolution;
-    pDriverData->presentationPixelBytes = 4;
-    pDriverData->presentationPixelStride = pGop->Mode->Info->PixelsPerScanLine;
-    pDriverData->pMainFramebufferMemory = (void*)pGop->Mode->FrameBufferBase;
-    pDriverData->mainFramebufferSize = pGop->Mode->FrameBufferSize;
-    pDriverData->pRenderFramebufferMemory = pBackbufferMemory;
-    pDriverData->swapBufferInfo.swapOp = DEXPROS_CPU_GR_SWAP_BUFFER_NONE_OP;
-    pDriverData->swapBufferInfo.regionStartX = 0;
-    pDriverData->swapBufferInfo.regionStartY = 0;
-    pDriverData->swapBufferInfo.regionWidth = 0;
-    pDriverData->swapBufferInfo.regionHeight = 0;
-    switch (pGop->Mode->Info->PixelFormat)
-    {
-        case PixelRedGreenBlueReserved8BitPerColor:
-            pDriverData->framebufferFormat = DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8;
-            break;
-        case PixelBlueGreenRedReserved8BitPerColor:
-            pDriverData->framebufferFormat = DEXPROS_CPU_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8;
-            break;
-        default:
-            break;
-    }
-
-    pDriver->swapBuffers = CpuGrSwapBuffers;
-    pDriver->clearScreen = CpuGrGraphicsClearScreen;
-    pDriver->clearScreenRegions = CpuGrGraphicsClearScreenRegions;
-    pDriver->blitImageToFramebuffer = CpuGrGraphicsBlitImageToFramebuffer;
-    pDriver->pDriverData = pDriverData;
+    pDriver->swapBuffers =
+    (DexprOS_GrSwapBuffers)CpuGrDrvRellocPointer((DexprOS_VirtualMemoryAddress)CpuGrSwapBuffers,
+                                                 rellocOffset);
+    pDriver->clearScreen =
+    (DexprOS_GrClearScreen)CpuGrDrvRellocPointer((DexprOS_VirtualMemoryAddress)CpuGrGraphicsClearScreen,
+                                                 rellocOffset);
+    pDriver->clearScreenRegions =
+    (DexprOS_GrClearScreenRegions)CpuGrDrvRellocPointer((DexprOS_VirtualMemoryAddress)CpuGrGraphicsClearScreenRegions,
+                                                        rellocOffset);
+    pDriver->blitImageToFramebuffer =
+    (DexprOS_GrBlitImageToFramebuffer)CpuGrDrvRellocPointer((DexprOS_VirtualMemoryAddress)CpuGrGraphicsBlitImageToFramebuffer,
+                                                            rellocOffset);
+    pDriver->pDriverData = pDrvData;
 
     return DEXPROS_CPU_GRAPHICS_DRV_INIT_SUCCESS;
 }
@@ -665,11 +610,9 @@ void DexprOS_DestroyCpuGraphicsDriver(DexprOS_GraphicsDriver* pDriver)
     // FreePool() UEFI function is no longer avaible.
     /*DexprOS_CpuGrGraphicsDrvData* pDriverData = (DexprOS_CpuGrGraphicsDrvData*)pDriver->pDriverData;
     if (pDriverData->pRenderFramebufferMemory != NULL)
-        pBootServices->FreePool(pDriverData->pRenderFramebufferMemory);
-    
-    pBootServices->FreePool(pDriver->pDriverData);*/
+        pBootServices->FreePool(pDriverData->pRenderFramebufferMemory);;*/
 
-    // TODO: implement OS-side memory allocation and free the drivers
+    // TODO: implement OS-side memory allocation and free the driver's
     // memory.
 }
 

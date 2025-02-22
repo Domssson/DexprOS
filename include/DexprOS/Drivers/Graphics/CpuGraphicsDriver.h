@@ -21,9 +21,46 @@ typedef enum DexprOS_CpuGraphicsDrvInitError
 } DexprOS_CpuGraphicsDrvInitError;
 
 
+typedef enum DexprOS_CpuGrSwapBufferOp
+{
+    DEXPROS_CPU_GR_SWAP_BUFFER_NONE_OP = 0,
+    DEXPROS_CPU_GR_SWAP_BUFFER_FULL_OP,
+    DEXPROS_CPU_GR_SWAP_BUFFER_REGION_OP
+} DexprOS_CpuGrSwapBufferOp;
+
+typedef struct DexprOS_CpuGrSwapBufferInfo
+{
+    DexprOS_CpuGrSwapBufferOp swapOp;
+    uint32_t regionStartX;
+    uint32_t regionStartY;
+    uint32_t regionWidth;
+    uint32_t regionHeight;
+} DexprOS_CpuGrSwapBufferInfo;
+
+
+typedef struct DexprOS_CpuGrGraphicsDrvData
+{
+    uint32_t presentationWidth;
+    uint32_t presentationHeight;
+    uint32_t presentationPixelBytes;
+    uint32_t presentationPixelStride;
+
+    void* pMainFramebufferMemory;
+    size_t mainFramebufferSize;
+
+    void* pRenderFramebufferMemory;
+
+    DexprOS_GrFramebufferFormat framebufferFormat;
+
+    DexprOS_CpuGrSwapBufferInfo swapBufferInfo;
+} DexprOS_CpuGrGraphicsDrvData;
+
+
+
 DexprOS_CpuGraphicsDrvInitError DexprOS_InitCpuGraphicsDriver(DexprOS_GraphicsDriver* pDriver,
-                                                              EFI_GRAPHICS_OUTPUT_PROTOCOL* pGop,
-                                                              EFI_BOOT_SERVICES* pBootServices);
+                                                              DexprOS_CpuGrGraphicsDrvData* pDrvData,
+                                                              const DexprOS_StartupFramebufferInfo* pFbInfo,
+                                                              DexprOS_VirtualMemoryAddress rellocOffset);
 
 void DexprOS_DestroyCpuGraphicsDriver(DexprOS_GraphicsDriver* pDriver);
 

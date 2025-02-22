@@ -225,8 +225,11 @@ static void InitialisePS2Keyboard(void)
 
 
 
-void DexprOS_InitialisePS2KeyboardDriver(const DexprOS_KeyToUnicodeTable* pLayoutTable)
+void DexprOS_InitialisePS2KeyboardDriver(const DexprOS_KeyToUnicodeTable* pLayoutTable,
+                                         DexprOS_VirtualMemoryAddress rellocOffset)
 {
+    DexprOS_RellocatePS2KeyboardScanCode2Pointers(rellocOffset);
+
     g_PS2KeyboardState.commandBufferSize = 0;
     g_PS2KeyboardState.currentCommandState = PS2K_COMMAND_STATE_FREE;
     g_PS2KeyboardState.listeningMode = PS2K_LISTENING_MODE_TABLE_CHARACTER_LOOKUP;

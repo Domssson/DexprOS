@@ -91,14 +91,6 @@ DexprOS_EnableMemoryProtectionCpuFeatures:
     or $0x400000, %r9
 
 .pku_unsupported:
-
-    /* Set PKS, bit 31 in cpuid ECX and bit 24 in CR4 */
-    test $0x80000000, %ecx
-    jz .pks_unsupported
-    or $0x1000000, %r9
-
-
-.pks_unsupported:
 .cpuid_eax7_unsupported:
 
 

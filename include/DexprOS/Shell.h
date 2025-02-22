@@ -4,6 +4,7 @@
 #include "DexprOS/Drivers/Graphics/GraphicsDriver.h"
 #include "DexprOS/Kernel/KeyboardInput.h"
 #include "DexprOS/Kernel/DexprOSCommon.h"
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -63,7 +64,8 @@ void DexprOS_CreateShell(DexprOS_Shell* pShell,
                          EFI_SYSTEM_TABLE* pUefiSystemTable,
                          DexprOS_GraphicsDriver* pGraphicsDrv,
                          unsigned consoleWidth,
-                         unsigned consoleHeight);
+                         unsigned consoleHeight,
+                         DexprOS_VirtualMemoryAddress rellocOffset);
 
 void DexprOS_ShellPutChar(DexprOS_Shell* pShell, DexprOS_Shell_Char character);
 

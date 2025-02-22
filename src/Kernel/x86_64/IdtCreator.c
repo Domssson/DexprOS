@@ -124,13 +124,25 @@ static const uint64_t g_DexprOS_ISA_ISR_Addresses[16] = {
 };
 
 
-void DexprOS_SetupIDT(uint16_t kernelCodeSegment)
+static uint64_t GetRellocatedFuncPointer(uint64_t address,
+                                         DexprOS_VirtualMemoryAddress kernelOffset)
+{
+    if (address > kernelOffset)
+        return address;
+    if (address == 0)
+        return 0;
+    return address + kernelOffset;
+}
+
+void DexprOS_SetupIDT(DexprOS_VirtualMemoryAddress rellocOffset,
+                      uint16_t kernelCodeSegment)
 {
     // Encode exception ISR entries
     for (unsigned i = 0; i < 32; ++i)
     {
         DexprOS_InterruptDescriptor desc = {0};
-        desc.offset = g_DexprOS_ExceptionISRAdresses[i];
+        desc.offset = GetRellocatedFuncPointer(g_DexprOS_ExceptionISRAdresses[i],
+                                               rellocOffset);
         desc.flags = g_DexprOS_IDTExceptionEntryFlags[i];
         desc.ist = 0;
 
@@ -143,7 +155,8 @@ void DexprOS_SetupIDT(uint16_t kernelCodeSegment)
     for (unsigned i = 0; i < 16; ++i)
     {
         DexprOS_InterruptDescriptor desc = {0};
-        desc.offset = g_DexprOS_ISA_ISR_Addresses[i];
+        desc.offset = GetRellocatedFuncPointer(g_DexprOS_ISA_ISR_Addresses[i],
+                                               rellocOffset);
         desc.segmentSelector = kernelCodeSegment;
         desc.ist = 0;
         desc.flags = DEXPROS_INTERRUPT_GATE_TYPE_INTERRUPT_GATE_BITS |

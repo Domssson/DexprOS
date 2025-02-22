@@ -19,7 +19,7 @@ typedef struct DexprOS_Shell_CommandFunc
 } DexprOS_Shell_CommandFunc;
 
 #define DEXPROS_SHELL_NUM_BUILTIN_COMMANDS 6
-static const DexprOS_Shell_CommandFunc g_DexprOS_ShellBuiltInCommands[DEXPROS_SHELL_NUM_BUILTIN_COMMANDS] = {
+static DexprOS_Shell_CommandFunc g_DexprOS_ShellBuiltInCommands[DEXPROS_SHELL_NUM_BUILTIN_COMMANDS] = {
     {"echo", DexprOS_ShellEcho},
     {"clear", DexprOS_ShellClear},
     {"help", DexprOS_ShellHelp},
@@ -29,12 +29,39 @@ static const DexprOS_Shell_CommandFunc g_DexprOS_ShellBuiltInCommands[DEXPROS_SH
 };
 
 
+static void ShellRellocCommandFunction(DexprOS_Shell_CommandFunc* pCommand,
+                                       DexprOS_VirtualMemoryAddress offset)
+{
+    DexprOS_VirtualMemoryAddress address = (DexprOS_VirtualMemoryAddress)pCommand->commandText;
+
+    if (address < offset && address != 0)
+    {
+        address += offset;
+        pCommand->commandText = (const char*)address;
+    }
+
+
+    address = (DexprOS_VirtualMemoryAddress)pCommand->commandFunc;
+
+    if (address < offset && address != 0)
+    {
+        address += offset;
+        pCommand->commandFunc = (void (*)(DexprOS_Shell*, const DexprOS_Shell_Char*, size_t))address;
+    }
+}
+
+
 void DexprOS_CreateShell(DexprOS_Shell* pShell,
                          EFI_SYSTEM_TABLE* pUefiSystemTable,
                          DexprOS_GraphicsDriver* pGraphicsDrv,
                          unsigned consoleWidth,
-                         unsigned consoleHeight)
+                         unsigned consoleHeight,
+                         DexprOS_VirtualMemoryAddress rellocOffset)
 {
+    for (size_t i = 0; i < DEXPROS_SHELL_NUM_BUILTIN_COMMANDS; ++i)
+        ShellRellocCommandFunction(&g_DexprOS_ShellBuiltInCommands[i],
+                                   rellocOffset);
+
     for (size_t i = 0; i < DEXPROS_SHELL_NUM_MAX_DISPLAY_CHARACTERS; ++i)
         pShell->onScreenCharacters[i] = 0;
 

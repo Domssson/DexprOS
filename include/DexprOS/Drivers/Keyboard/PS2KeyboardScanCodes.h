@@ -2,6 +2,7 @@
 #define DEXPROS_DRIVERS_KEYBOARD_PS2KEYBOARDSCANCODES_H_INCLUDED
 
 #include "DexprOS/Kernel/KeyboardInput.h"
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -589,6 +590,75 @@ static PS2KeyboardScanCodes g_scanCode2SetGlobal = {
     .pSpecialSequences = &g_scanCode2PauseSequence,
     .numSpecialSequences = 1
 };
+
+inline static const void* DexprOS_PS2ScanCode2RellocatePointer(const void* pointer,
+                                                               DexprOS_VirtualMemoryAddress kernelOffset)
+{
+    if ((DexprOS_VirtualMemoryAddress)pointer > kernelOffset)
+        return pointer;
+    if (pointer == NULL)
+        return NULL;
+    return (const void*)((DexprOS_VirtualMemoryAddress)pointer + kernelOffset);
+}
+
+static void DexprOS_RellocatePS2KeyboardScanCode2Pointers(DexprOS_VirtualMemoryAddress kernelOffset)
+{
+    g_scanCode2Level2PrtScnReleaseSequence.pSequence =
+    (const uint8_t*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level2PrtScnReleaseSequence.pSequence,
+                                                         kernelOffset);
+
+    g_scanCode2Level1PrtScnPressedSequence.pSequence =
+    (const uint8_t*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1PrtScnPressedSequence.pSequence,
+                                                         kernelOffset);
+
+    g_scanCode2PauseSequence.pSequence =
+    (const uint8_t*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2PauseSequence.pSequence,
+                                                         kernelOffset);
+
+    g_scanCode2Level2SubTables[0].pKeysPerByte =
+    (const PS2KeyboardMapKey*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level2SubTables[0].pKeysPerByte,
+                                                                   kernelOffset);
+
+    g_scanCode2Level2SubTables[0].pSpecialSequences =
+    (const PS2KeyboardSpecialSequence*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level2SubTables[0].pSpecialSequences,
+                                                                            kernelOffset);
+
+    g_scanCode2Level1SubTables[0].pKeysPerByte =
+    (const PS2KeyboardMapKey*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1SubTables[0].pKeysPerByte,
+                                                                   kernelOffset);
+
+    g_scanCode2Level1SubTables[0].pByteExtendedScanCodes =
+    (const PS2KeyboardScanCodes*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1SubTables[0].pByteExtendedScanCodes,
+                                                                      kernelOffset);
+
+    g_scanCode2Level1SubTables[0].pByteExtendCodes =
+    (const uint8_t*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1SubTables[0].pByteExtendCodes,
+                                                         kernelOffset);
+
+    g_scanCode2Level1SubTables[0].pSpecialSequences =
+    (const PS2KeyboardSpecialSequence*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1SubTables[0].pSpecialSequences,
+                                                                            kernelOffset);
+
+    g_scanCode2Level1SubTables[1].pKeysPerByte =
+    (const PS2KeyboardMapKey*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2Level1SubTables[1].pKeysPerByte,
+                                                                   kernelOffset);
+
+    g_scanCode2SetGlobal.pKeysPerByte =
+    (const PS2KeyboardMapKey*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2SetGlobal.pKeysPerByte,
+                                                                   kernelOffset);
+
+    g_scanCode2SetGlobal.pByteExtendedScanCodes =
+    (const PS2KeyboardScanCodes*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2SetGlobal.pByteExtendedScanCodes,
+                                                                      kernelOffset);
+
+    g_scanCode2SetGlobal.pByteExtendCodes =
+    (const uint8_t*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2SetGlobal.pByteExtendCodes,
+                                                         kernelOffset);
+
+    g_scanCode2SetGlobal.pSpecialSequences =
+    (const PS2KeyboardSpecialSequence*)DexprOS_PS2ScanCode2RellocatePointer(g_scanCode2SetGlobal.pSpecialSequences,
+                                                                            kernelOffset);
+}
 
 
 #endif // DEXPROS_DRIVERS_KEYBOARD_PS2KEYBOARDSCANCODES_H_INCLUDED

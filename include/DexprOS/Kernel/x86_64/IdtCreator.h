@@ -1,6 +1,8 @@
 #ifndef DEXPROS_KERNEL_X86_64_IDTCREATOR_H_INCLUDED
 #define DEXPROS_KERNEL_X86_64_IDTCREATOR_H_INCLUDED
 
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -43,7 +45,8 @@ typedef struct DexprOS_InterruptDescriptor
 void DexprOS_EncodeIDTEntry(uint8_t entryIndex,
                             const DexprOS_InterruptDescriptor* pDesc);
 
-void DexprOS_SetupIDT(uint16_t kernelCodeSegment);
+void DexprOS_SetupIDT(DexprOS_VirtualMemoryAddress rellocOffset,
+                      uint16_t kernelCodeSegment);
 
 
 #ifdef __cplusplus

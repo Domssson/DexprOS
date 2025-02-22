@@ -61,7 +61,7 @@ static DexprOS_InitialMemMapMappedUsage ToDexprOSInitialMemMapUsage(EFI_MEMORY_T
         case EfiBootServicesData:
         case EfiRuntimeServicesCode:
         case EfiRuntimeServicesData:
-            return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED;
+            return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE;
 
         case EfiLoaderCode:
             return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_CODE;
@@ -278,7 +278,7 @@ static void InitMemMapAllocCallback(DexprOS_InitialMemMapEntry memEntry,
     pAllocStruct->numRegions += 1;
 
     if (memEntry.memoryType == DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE &&
-        memEntry.usage == DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED &&
+        memEntry.usage == DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE &&
         memEntry.numPhysicalPages > pAllocStruct->numLargestUsableRegionPages)
     {
         pAllocStruct->largestUsableRegionAddress = memEntry.physicalAddress;

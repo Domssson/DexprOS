@@ -61,7 +61,7 @@ static DexprOS_InitialMemMapMappedUsage ToDexprOSInitialMemMapUsage(EFI_MEMORY_T
     case EfiBootServicesData:
     case EfiRuntimeServicesCode:
     case EfiRuntimeServicesData:
-        return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED;
+        return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE;
 
     case EfiLoaderCode:
         return DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_CODE;
@@ -156,7 +156,6 @@ static bool GetNextEfiMapEntry(const void* pUefiMemoryMap,
     pOutMemRange->usage = DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_NONE;
     pOutMemRange->flags = 0;
     pOutMemRange->physicalAddress = 0;
-    pOutMemRange->virtualAddress = 0;
     pOutMemRange->numPhysicalPages = 0;
     
 
@@ -168,8 +167,6 @@ static bool GetNextEfiMapEntry(const void* pUefiMemoryMap,
             (pMemoryDesc->PhysicalStart < pOutMemRange->physicalAddress || !nextDescFound))
         {
             pOutMemRange->physicalAddress = pMemoryDesc->PhysicalStart;
-            /* We still use identity paging at this point */
-            pOutMemRange->virtualAddress = pMemoryDesc->PhysicalStart;
             pOutMemRange->numPhysicalPages = pMemoryDesc->NumberOfPages * EFI_PAGE_SIZE / DEXPROS_PHYSICAL_PAGE_SIZE;
             pOutMemRange->memoryType = ToDexprOSMemType(pMemoryDesc->Type);
             pOutMemRange->usage = ToDexprOSInitialMemMapUsage(pMemoryDesc->Type);
@@ -201,7 +198,6 @@ static void IterEfiMemMapAsInitMap(const void* pUefiMemoryMap,
     combinedRange.usage = DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_NONE;
     combinedRange.flags = 0;
     combinedRange.physicalAddress = 0;
-    combinedRange.virtualAddress = 0;
     combinedRange.numPhysicalPages = 0;
 
 
@@ -211,8 +207,6 @@ static void IterEfiMemMapAsInitMap(const void* pUefiMemoryMap,
     {
         DexprOS_PhysicalMemoryAddress rangeEnd = combinedRange.physicalAddress +
                                                  combinedRange.numPhysicalPages * DEXPROS_PHYSICAL_PAGE_SIZE;
-        DexprOS_VirtualMemoryAddress virtRangeEnd = combinedRange.virtualAddress +
-                                                    combinedRange.numPhysicalPages * DEXPROS_PHYSICAL_PAGE_SIZE;
 
         DexprOS_InitialMemMapEntry nextMemRegion;
 
@@ -227,7 +221,6 @@ static void IterEfiMemMapAsInitMap(const void* pUefiMemoryMap,
 
         // Combine ranges whenever possible
         if (nextMemRegion.physicalAddress == rangeEnd &&
-            nextMemRegion.virtualAddress == virtRangeEnd &&
             nextMemRegion.memoryType == combinedRange.memoryType &&
             nextMemRegion.usage == combinedRange.usage &&
             nextMemRegion.flags == combinedRange.flags &&
@@ -244,7 +237,6 @@ static void IterEfiMemMapAsInitMap(const void* pUefiMemoryMap,
             }
 
             combinedRange.physicalAddress = nextMemRegion.physicalAddress;
-            combinedRange.virtualAddress = nextMemRegion.virtualAddress;
             combinedRange.numPhysicalPages = nextMemRegion.numPhysicalPages;
             combinedRange.memoryType = nextMemRegion.memoryType;
             combinedRange.usage = nextMemRegion.usage;
@@ -278,11 +270,10 @@ static void InitMemMapAllocCallback(DexprOS_InitialMemMapEntry memEntry,
     pAllocStruct->numRegions += 1;
 
     if (memEntry.memoryType == DEXPROS_PHYSICAL_MEMORY_TYPE_USABLE &&
-        memEntry.usage == DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED &&
+        memEntry.usage == DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE &&
         memEntry.numPhysicalPages > pAllocStruct->numLargestUsableRegionPages)
     {
         pAllocStruct->largestUsableRegionAddress = memEntry.physicalAddress;
-        pAllocStruct->virtualAddress = memEntry.virtualAddress;
         pAllocStruct->numLargestUsableRegionPages = memEntry.numPhysicalPages;
     }
 }
@@ -379,7 +370,6 @@ static void FillInitMemMapEntry(DexprOS_InitialMemMapEntry memEntry,
 
         *pEntry = memEntry;
         pEntry->physicalAddress += pCreateInfo->numInitMapPages * DEXPROS_PHYSICAL_PAGE_SIZE;
-        pEntry->virtualAddress += pCreateInfo->numInitMapPages * DEXPROS_PHYSICAL_PAGE_SIZE;
         pEntry->numPhysicalPages -= pCreateInfo->numInitMapPages;
     }
     else
@@ -407,6 +397,8 @@ static bool CreateInitMemMap(const void* pUefiMemoryMap,
 
     pOutMemMap->pEntries = (DexprOS_InitialMemMapEntry*)virtAddress;
     pOutMemMap->numEntries = 0;
+    // Just after leaving boot services we still use identity mapping
+    pOutMemMap->virtualMapOffset = 0;
 
     initMapStruct.pMemMap = pOutMemMap;
     initMapStruct.availableSize = availableSize;

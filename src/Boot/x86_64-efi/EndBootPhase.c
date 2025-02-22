@@ -786,7 +786,7 @@ EFI_STATUS DexprOSBoot_EndBootPhase(EFI_HANDLE imageHandle,
                                               framebufferSize,
                                               pageMapSetupType,
                                               &pageMapBuffer);
-    return mapSuccess;
+    return (mapSuccess ? EFI_SUCCESS : EFI_OUT_OF_RESOURCES);
 }
 
 

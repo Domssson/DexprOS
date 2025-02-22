@@ -9,7 +9,7 @@
 typedef enum DexprOS_InitialMemMapMappedUsage
 {
     DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_NONE,
-    DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED,
+    DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE,
     DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_CODE,
     DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_KERNEL_DATA,
     DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_BOOT_CODE,
@@ -25,7 +25,6 @@ typedef struct DexprOS_InitialMemMapEntry
     DexprOS_PhysicalMemoryFlags flags;
 
     DexprOS_PhysicalMemoryAddress physicalAddress;
-    DexprOS_VirtualMemoryAddress virtualAddress;
     size_t numPhysicalPages;
 } DexprOS_InitialMemMapEntry;
 
@@ -40,6 +39,9 @@ typedef struct DexprOS_InitialMemMap
 {
     DexprOS_InitialMemMapEntry* pEntries;
     size_t numEntries;
+
+    // All usable and kernel regions are initially mapped with this offset
+    size_t virtualMapOffset;
 } DexprOS_InitialMemMap;
 
 

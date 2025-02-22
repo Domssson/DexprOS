@@ -390,217 +390,106 @@ UINTN DexprOSBoot_CalculateInitialPageMap5Size(const void* pUefiMemoryMap,
 }
 
 
-static bool PrepareLevel1Table(EFI_PHYSICAL_ADDRESS startAddress,
+
+static void PrepareLevel1Table(EFI_PHYSICAL_ADDRESS startAddress,
                                EFI_PHYSICAL_ADDRESS endAddress,
-                               uint64_t* pLevel2Table,
-                               uint64_t** ppNextAvailableTableSpace,
-                               uint64_t* pPageMapBufferEnd)
+                               uint64_t* p1LevelTable)
 {
-    uint64_t level2Offset = ((startAddress >> 21) & 0x1FF);
+    unsigned startIndex = (startAddress & 0x1FF000) >> 12;
+    unsigned endIndex = ((endAddress - 1) & 0x1FF000) >> 12;
 
-    uint64_t* pLevel2Entry = pLevel2Table + level2Offset;
+    EFI_PHYSICAL_ADDRESS address = startAddress;
 
-    uint64_t* pLevel1Table = NULL;
-
-    if ((*pLevel2Entry & DEXPROSBOOT_PAGE_PRESENT_BIT) == 0)
+    for (unsigned j = startIndex; j <= endIndex; ++j)
     {
-        if (*ppNextAvailableTableSpace + 512 > pPageMapBufferEnd)
-            return false;
-        
-        pLevel1Table = *ppNextAvailableTableSpace;
-        *ppNextAvailableTableSpace += 512;
+        uint64_t* pEntry = p1LevelTable + j;
 
-        for (int i = 0; i < 512; ++i)
-            pLevel1Table[i] = 0;
+        *pEntry = 0;
+        *pEntry |= ((uint64_t)address & 0xFFFFFFFFFF000);
+        *pEntry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
 
-        *pLevel2Entry |= ((uint64_t)pLevel1Table & 0xFFFFFFFFFFFFF000);
-        *pLevel2Entry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
+        address += DEXPROSBOOT_SINGLE_PAGE_MAP_TABLE_SIZE;
     }
-    else
-    {
-        pLevel1Table = (uint64_t*)(*pLevel2Entry & 0xFFFFFFFFFFFFF000);
-    }
-
-    
-    EFI_PHYSICAL_ADDRESS entryAddress = (startAddress & 0xFFFFFFFFFFFFF000);
-
-    while (entryAddress < endAddress)
-    {
-        uint64_t entryIndex = ((entryAddress >> 12) & 0x1FF);
-        pLevel1Table[entryIndex] |= entryAddress;
-        pLevel1Table[entryIndex] |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
-
-        entryAddress += DEXPROSBOOT_INITIAL_PAGE_SIZE;
-    }
-
-    return true;
 }
 
-static bool PrepareLevel2Table(EFI_PHYSICAL_ADDRESS startAddress,
-                               EFI_PHYSICAL_ADDRESS endAddress,
-                               uint64_t* pLevel3Table,
-                               uint64_t** ppNextAvailableTableSpace,
-                               uint64_t* pPageMapBufferEnd)
+
+static bool PrepareLevelPageTables(EFI_PHYSICAL_ADDRESS startAddress,
+                                   EFI_PHYSICAL_ADDRESS endAddress,
+                                   uint64_t* pParentTable,
+                                   uint64_t** ppNextAvailableTableSpace,
+                                   uint64_t* pPageMapBufferEnd,
+                                   unsigned level)
 {
-    uint64_t level3Offset = ((startAddress >> 30) & 0x1FF);
+    const unsigned levelMaskShifts[4] = {21, 30, 39, 48};
+    const uint64_t levelManagedMemory[4] = {
+        DEXPROSBOOT_LEVEL1_PAGE_TABLE_MANAGED_BYTES,
+        DEXPROSBOOT_LEVEL2_PAGE_TABLE_MANAGED_BYTES,
+        DEXPROSBOOT_LEVEL3_PAGE_TABLE_MANAGED_BYTES,
+        DEXPROSBOOT_LEVEL4_PAGE_TABLE_MANAGED_BYTES
+    };
+    const uint64_t levelMasks[4] = {
+        0xFFFFFFFFFFE00000,
+        0xFFFFFFFFC0000000,
+        0xFFFFFF8000000000,
+        0xFFFF000000000000
+    };
 
-    uint64_t* pLevel3Entry = pLevel3Table + level3Offset;
+    unsigned maskShift = levelMaskShifts[level - 1];
+    uint64_t managedMemory = levelManagedMemory[level - 1];
+    uint64_t levelMask = levelMasks[level - 1];
 
-    uint64_t* pLevel2Table = NULL;
 
-    if ((*pLevel3Entry & DEXPROSBOOT_PAGE_PRESENT_BIT) == 0)
+    unsigned startIndex = (startAddress >> maskShift) & 0x1FF;
+    unsigned endIndex = ((endAddress - 1) >> maskShift) & 0x1FF;
+
+
+    EFI_PHYSICAL_ADDRESS subTableManagedStart = startAddress;
+
+
+    for (unsigned j = startIndex; j <= endIndex; ++j)
     {
-        if (*ppNextAvailableTableSpace + 512 > pPageMapBufferEnd)
-            return false;
+        uint64_t* pEntry = pParentTable + j;
+
+        if ((*pEntry & DEXPROSBOOT_PAGE_PRESENT_BIT) == 0)
+        {
+            if (*ppNextAvailableTableSpace + 512 > pPageMapBufferEnd)
+                return false;
+            
+            uint64_t* pNewTable = *ppNextAvailableTableSpace;
+            *ppNextAvailableTableSpace += 512;
+
+            for (int i = 0; i < 512; ++i)
+                pNewTable[i] = 0;
+            
+            *pEntry |= ((uint64_t)pNewTable & 0xFFFFFFFFFF000);
+            *pEntry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
+        }
+
+        uint64_t* pNewTable = (uint64_t*)(*pEntry & 0xFFFFFFFFFF000);
+
+        EFI_PHYSICAL_ADDRESS newStart = subTableManagedStart;
+        EFI_PHYSICAL_ADDRESS newEnd = (subTableManagedStart & levelMask) + managedMemory;
+        newEnd = (newEnd < endAddress ? newEnd : endAddress);
+
         
-        pLevel2Table = *ppNextAvailableTableSpace;
-        *ppNextAvailableTableSpace += 512;
+        if (level == 1)
+        {
+            PrepareLevel1Table(newStart, newEnd, pNewTable);
+        }
+        else
+        {
+            if (!PrepareLevelPageTables(newStart,
+                                        newEnd,
+                                        pNewTable,
+                                        ppNextAvailableTableSpace,
+                                        pPageMapBufferEnd,
+                                        level - 1))
+                return false;
+        }
 
-        for (int i = 0; i < 512; ++i)
-            pLevel2Table[i] = 0;
-
-        *pLevel3Entry |= ((uint64_t)pLevel2Table & 0xFFFFFFFFFFFFF000);
-        *pLevel3Entry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
+        subTableManagedStart = (subTableManagedStart & levelMask);
+        subTableManagedStart += managedMemory;
     }
-    else
-    {
-        pLevel2Table = (uint64_t*)(*pLevel3Entry & 0xFFFFFFFFFFFFF000);
-    }
-
-
-    const UINTN managedMemorySize = DEXPROSBOOT_LEVEL1_PAGE_TABLE_MANAGED_BYTES;
-    EFI_PHYSICAL_ADDRESS alignedStartAddress = (startAddress / managedMemorySize) * managedMemorySize;
-
-    EFI_PHYSICAL_ADDRESS subtableStartAddress = startAddress;
-    EFI_PHYSICAL_ADDRESS subtableEndAddress = alignedStartAddress + managedMemorySize;
-    subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-
-    while (subtableStartAddress < endAddress)
-    {
-        if (!PrepareLevel1Table(subtableStartAddress,
-                                subtableEndAddress,
-                                pLevel2Table,
-                                ppNextAvailableTableSpace,
-                                pPageMapBufferEnd))
-            return false;
-
-        subtableStartAddress = (subtableStartAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = (subtableEndAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-    }
-
-    return true;
-}
-
-static bool PrepareLevel3Table(EFI_PHYSICAL_ADDRESS startAddress,
-                               EFI_PHYSICAL_ADDRESS endAddress,
-                               uint64_t* pPML4Table,
-                               uint64_t** ppNextAvailableTableSpace,
-                               uint64_t* pPageMapBufferEnd)
-{
-    uint64_t level4Offset = ((startAddress >> 39) & 0x1FF);
-
-    uint64_t* pLevel4Entry = pPML4Table + level4Offset;
-
-    uint64_t* pLevel3Table = NULL;
-
-    if ((*pLevel4Entry & DEXPROSBOOT_PAGE_PRESENT_BIT) == 0)
-    {
-        if (*ppNextAvailableTableSpace + 512 > pPageMapBufferEnd)
-            return false;
-        
-        pLevel3Table = *ppNextAvailableTableSpace;
-        *ppNextAvailableTableSpace += 512;
-
-        for (int i = 0; i < 512; ++i)
-            pLevel3Table[i] = 0;
-
-        *pLevel4Entry |= ((uint64_t)pLevel3Table & 0xFFFFFFFFFFFFF000);
-        *pLevel4Entry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
-    }
-    else
-    {
-        pLevel3Table = (uint64_t*)(*pLevel4Entry & 0xFFFFFFFFFFFFF000);
-    }
-
-
-    const UINTN managedMemorySize = DEXPROSBOOT_LEVEL2_PAGE_TABLE_MANAGED_BYTES;
-    EFI_PHYSICAL_ADDRESS alignedStartAddress = (startAddress / managedMemorySize) * managedMemorySize;
-
-    EFI_PHYSICAL_ADDRESS subtableStartAddress = startAddress;
-    EFI_PHYSICAL_ADDRESS subtableEndAddress = alignedStartAddress + managedMemorySize;
-    subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-
-    while (subtableStartAddress < endAddress)
-    {
-        if (!PrepareLevel2Table(subtableStartAddress,
-                                subtableEndAddress,
-                                pLevel3Table,
-                                ppNextAvailableTableSpace,
-                                pPageMapBufferEnd))
-            return false;
-
-        subtableStartAddress = (subtableStartAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = (subtableEndAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-    }
-
-    return true;
-}
-
-static bool PrepareLevel4Table(EFI_PHYSICAL_ADDRESS startAddress,
-                               EFI_PHYSICAL_ADDRESS endAddress,
-                               uint64_t* pPML5Table,
-                               uint64_t** ppNextAvailableTableSpace,
-                               uint64_t* pPageMapBufferEnd)
-{
-    uint64_t level5Offset = ((startAddress >> 48) & 0x1FF);
-
-    uint64_t* pLevel5Entry = pPML5Table + level5Offset;
-
-    uint64_t* pLevel4Table = NULL;
-
-    if ((*pLevel5Entry & DEXPROSBOOT_PAGE_PRESENT_BIT) == 0)
-    {
-        if (*ppNextAvailableTableSpace + 512 > pPageMapBufferEnd)
-            return false;
-        
-        pLevel4Table = *ppNextAvailableTableSpace;
-        *ppNextAvailableTableSpace += 512;
-
-        for (int i = 0; i < 512; ++i)
-            pLevel4Table[i] = 0;
-
-        *pLevel5Entry |= ((uint64_t)pLevel4Table & 0xFFFFFFFFFFFFF000);
-        *pLevel5Entry |= (DEXPROSBOOT_PAGE_PRESENT_BIT | DEXPROSBOOT_PAGE_READWRITE_BIT);
-    }
-    else
-    {
-        pLevel4Table = (uint64_t*)(*pLevel5Entry & 0xFFFFFFFFFFFFF000);
-    }
-
-
-    const UINTN managedMemorySize = DEXPROSBOOT_LEVEL3_PAGE_TABLE_MANAGED_BYTES;
-    EFI_PHYSICAL_ADDRESS alignedStartAddress = (startAddress / managedMemorySize) * managedMemorySize;
-
-    EFI_PHYSICAL_ADDRESS subtableStartAddress = startAddress;
-    EFI_PHYSICAL_ADDRESS subtableEndAddress = alignedStartAddress + managedMemorySize;
-    subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-
-    while (subtableStartAddress < endAddress)
-    {
-        if (!PrepareLevel3Table(subtableStartAddress,
-                                subtableEndAddress,
-                                pLevel4Table,
-                                ppNextAvailableTableSpace,
-                                pPageMapBufferEnd))
-            return false;
-
-        subtableStartAddress = (subtableStartAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = (subtableEndAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-    }
-
     return true;
 }
 
@@ -611,28 +500,11 @@ static bool MapMemoryRangeInLevel4Table(EFI_PHYSICAL_ADDRESS startAddress,
                                         uint64_t** ppNextAvailableTableSpace,
                                         uint64_t* pPageMapBufferEnd)
 {
-    const UINTN managedMemorySize = DEXPROSBOOT_LEVEL3_PAGE_TABLE_MANAGED_BYTES;
-    EFI_PHYSICAL_ADDRESS alignedStartAddress = (startAddress / managedMemorySize) * managedMemorySize;
-
-    EFI_PHYSICAL_ADDRESS subtableStartAddress = startAddress;
-    EFI_PHYSICAL_ADDRESS subtableEndAddress = alignedStartAddress + managedMemorySize;
-    subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-
-    while (subtableStartAddress < endAddress)
-    {
-        if (!PrepareLevel3Table(subtableStartAddress,
-                                subtableEndAddress,
-                                pPML4Table,
-                                ppNextAvailableTableSpace,
-                                pPageMapBufferEnd))
-            return false;
-
-        subtableStartAddress = (subtableStartAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = (subtableEndAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-    }
-
-    return true;
+    return PrepareLevelPageTables(startAddress, endAddress,
+                                  pPML4Table,
+                                  ppNextAvailableTableSpace,
+                                  pPageMapBufferEnd,
+                                  3);
 }
 
 
@@ -642,28 +514,11 @@ static bool MapMemoryRangeInLevel5Table(EFI_PHYSICAL_ADDRESS startAddress,
                                         uint64_t** ppNextAvailableTableSpace,
                                         uint64_t* pPageMapBufferEnd)
 {
-    const UINTN managedMemorySize = DEXPROSBOOT_LEVEL4_PAGE_TABLE_MANAGED_BYTES;
-    EFI_PHYSICAL_ADDRESS alignedStartAddress = (startAddress / managedMemorySize) * managedMemorySize;
-
-    EFI_PHYSICAL_ADDRESS subtableStartAddress = startAddress;
-    EFI_PHYSICAL_ADDRESS subtableEndAddress = alignedStartAddress + managedMemorySize;
-    subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-
-    while (subtableStartAddress < endAddress)
-    {
-        if (!PrepareLevel4Table(subtableStartAddress,
-                                subtableEndAddress,
-                                pPML5Table,
-                                ppNextAvailableTableSpace,
-                                pPageMapBufferEnd))
-            return false;
-
-        subtableStartAddress = (subtableStartAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = (subtableEndAddress / managedMemorySize + 1) * managedMemorySize;
-        subtableEndAddress = subtableEndAddress < endAddress ? subtableEndAddress : endAddress;
-    }
-
-    return true;
+    return PrepareLevelPageTables(startAddress, endAddress,
+                                  pPML5Table,
+                                  ppNextAvailableTableSpace,
+                                  pPageMapBufferEnd,
+                                  4);
 }
 
 

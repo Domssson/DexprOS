@@ -465,7 +465,7 @@ void DexprOS_MarkPhysicalMemTreeRegions(const DexprOS_PhysicalMemTree* pTree,
             break;
 
         case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_NONE:
-        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_MAPPED:
+        case DEXPROS_INITIAL_MEMMAP_MAPPED_USAGE_AVAILABLE:
             break;
         }
     }

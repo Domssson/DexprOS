@@ -1,6 +1,8 @@
 #ifndef DEXPROS_DRIVERS_GRAPHICS_GRAPHICSDRIVER_H_INCLUDED
 #define DEXPROS_DRIVERS_GRAPHICS_GRAPHICSDRIVER_H_INCLUDED
 
+#include "DexprOS/Kernel/Memory/MemoryDef.h"
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -14,11 +16,37 @@ extern "C"
 typedef uint8_t DexprOS_GrColorValue;
 
 
-typedef enum DexprOS_GrImageFormat{
+typedef enum DexprOS_GrImageFormat
+{
     DEXPROS_GR_IMAGE_FORMAT_RGB8,
     DEXPROS_GR_IMAGE_FORMAT_RGBA8,
     DEXPROS_GR_IMAGE_FORMAT_Max
 } DexprOS_GrImageFormat;
+
+
+typedef enum DexprOS_GrFramebufferFormat
+{
+    DEXPROS_GR_FRAMEBUFFER_FORMAT_RGB8_RESERVED8,
+    DEXPROS_GR_FRAMEBUFFER_FORMAT_BGR8_RESERVED8,
+    DEXPROS_GR_FRAMEBUFFER_FORMAT_Max
+} DexprOS_GrFramebufferFormat;
+
+
+typedef struct DexprOS_StartupFramebufferInfo
+{
+    uint32_t presentationWidth;
+    uint32_t presentationHeight;
+    uint32_t presentationPixelBytes;
+    uint32_t presentationPixelStride;
+
+    DexprOS_PhysicalMemoryAddress framebufferPhysAddr;
+    DexprOS_VirtualMemoryAddress framebufferVirtAddr;
+    size_t mainFramebufferSize;
+
+    void* pRenderBackBufferMemory;
+
+    DexprOS_GrFramebufferFormat framebufferFormat;
+} DexprOS_StartupFramebufferInfo;
 
 
 typedef struct DexprOS_GrGraphicsColor
