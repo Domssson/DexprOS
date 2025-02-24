@@ -1,0 +1,9 @@
+#ifndef DEXPROS_BOOT_x86_64_EFI_EMBEDDEDKERNEL_H_INCLUDED
+#define DEXPROS_BOOT_x86_64_EFI_EMBEDDEDKERNEL_H_INCLUDED
+
+
+extern char DexprOSBoot_KernelExecStart[];
+extern char DexprOSBoot_KernelExecEnd[];
+
+
+#endif // DEXPROS_BOOT_x86_64_EFI_EMBEDDEDKERNEL_H_INCLUDED
