@@ -31,9 +31,15 @@ set(DEXPROS_INCLUDE_DIR "${DEXPROS_BASE_DIR}/include")
 
 set(DEXPROS_KERNEL_SOURCES ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/UefiBoot.c
                            ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/EmbeddedKernel.S
+                           ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/FileSystems/BinaryStream.c
+                           ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/Elf/ElfHeaders.c
+                           ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/Elf/ElfLoader.c
                            ${DEXPROS_SRC_DIR}/Kernel/kstdlib/string.c)
 
 set(DEXPROS_KERNEL_HEADERS ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/EmbeddedKernel.h
+                           ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/FileSystems/BinaryStream.h
+                           ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/Elf/ElfHeaders.h
+                           ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/Elf/ElfLoader.h
                            ${DEXPROS_INCLUDE_DIR}/DexprOS/Kernel/kstdlib/string.h)
 
 

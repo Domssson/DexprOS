@@ -1,4 +1,6 @@
 #include "DexprOS/Boot/x86_64-efi/EmbeddedKernel.h"
+#include "DexprOS/Boot/x86_64-efi/FileSystems/BinaryStream.h"
+#include "DexprOS/Boot/x86_64-efi/Elf/ElfLoader.h"
 #include "DexprOS/Kernel/kstdlib/string.h"
 
 #include <efi.h>
@@ -8,16 +10,20 @@
 #include <stdbool.h>
 
 
-static EFI_STATUS print(EFI_SYSTEM_TABLE* pSystemTable, const char* text);
+EFI_STATUS print(const char* text);
 
-static EFI_STATUS printHex(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number);
+EFI_STATUS printHex(uint64_t number);
 
-static EFI_STATUS printDec(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number);
+EFI_STATUS printDec(uint64_t number);
+
+
+EFI_SYSTEM_TABLE* g_pSystemTable = NULL;
 
 
 EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
 {
     EFI_STATUS status = 0;
+    g_pSystemTable = pSystemTable;
 
 
     pSystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
@@ -35,48 +41,62 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         return status;
 
 
-    status = print(pSystemTable, "Hello world!\n");
+    status = print("Hello world!\n");
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, "Path to the kernel that was embedded: ");
+    status = print("Path to the kernel that was embedded: ");
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, DEXPROSBOOT_EMBED_KERNEL_PATH);
+    status = print(DEXPROSBOOT_EMBED_KERNEL_PATH);
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, "\nKernel size: ");
+    status = print("\nKernel size: ");
     if (EFI_ERROR(status))
         return status;
 
 
     uint64_t kernelSize = DexprOSBoot_KernelExecEnd - DexprOSBoot_KernelExecStart;
 
-    status = printDec(pSystemTable, kernelSize);
+    status = printDec(kernelSize);
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, "\nKernel mem start: ");
+    status = print("\nKernel mem start: ");
     if (EFI_ERROR(status))
         return status;
 
-    status = printHex(pSystemTable, (uint64_t)DexprOSBoot_KernelExecStart);
+    status = printHex((uint64_t)DexprOSBoot_KernelExecStart);
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, "\nKernel mem end: ");
+    status = print("\nKernel mem end: ");
     if (EFI_ERROR(status))
         return status;
 
-    status = printHex(pSystemTable, (uint64_t)DexprOSBoot_KernelExecEnd);
+    status = printHex((uint64_t)DexprOSBoot_KernelExecEnd);
     if (EFI_ERROR(status))
         return status;
 
-    status = print(pSystemTable, "\n");
+    status = print("\n");
     if (EFI_ERROR(status))
         return status;
+
+
+    DexprOSBoot_EmbeddedFileBinaryStreamData binaryStreamData;
+    DexprOSBoot_BinaryStream kernelStream = DexprOSBoot_CreateEmbeddedFileStream(&binaryStreamData,
+                                                                                 DexprOSBoot_KernelExecStart,
+                                                                                 DexprOSBoot_KernelExecEnd);
+
+    int elfSuccess = DexprOSBoot_LoadElf64(&kernelStream);
+    if (elfSuccess == 0)
+    {
+        status = print("ELF loaded!\n");
+        if (EFI_ERROR(status))
+            return status;
+    }
 
 
     status = pSystemTable->ConIn->Reset(pSystemTable->ConIn, FALSE);
@@ -92,18 +112,18 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
 }
 
 
-EFI_STATUS print(EFI_SYSTEM_TABLE* pSystemTable, const char* text)
+EFI_STATUS print(const char* text)
 {
     EFI_STATUS status = EFI_SUCCESS;
 
     while (text[0] != '\0')
     {
         if (text[0] == '\n')
-            status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, L"\r\n");
+            status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, L"\r\n");
         else
         {
             CHAR16 efiString[2] = {text[0], '\0'};
-            status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, efiString);
+            status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, efiString);
         }
 
         if (EFI_ERROR(status))
@@ -116,7 +136,7 @@ EFI_STATUS print(EFI_SYSTEM_TABLE* pSystemTable, const char* text)
 }
 
 
-EFI_STATUS printHex(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
+EFI_STATUS printHex(uint64_t number)
 {
     CHAR16 strings[16][2] = {L"0", L"1", L"2", L"3", L"4", L"5", L"6", L"7", L"8", L"9", L"A", L"B", L"C", L"D", L"E", L"F"};
 
@@ -124,7 +144,7 @@ EFI_STATUS printHex(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
 
     uint64_t power = 15;
 
-    status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, L"0x");
+    status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, L"0x");
     if (EFI_ERROR(status))
         return status;
 
@@ -137,7 +157,7 @@ EFI_STATUS printHex(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
     {
         unsigned index = (number >> (4 * power)) & 0xF;
 
-        status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, strings[index]);
+        status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, strings[index]);
         if (EFI_ERROR(status))
             return status;
 
@@ -146,14 +166,14 @@ EFI_STATUS printHex(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
 
 
     unsigned index0 = number & 0xF;
-    status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, strings[index0]);
+    status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, strings[index0]);
 
 
     return status;
 }
 
 
-EFI_STATUS printDec(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
+EFI_STATUS printDec(uint64_t number)
 {
     CHAR16 strings[10][2] = {L"0", L"1", L"2", L"3", L"4", L"5", L"6", L"7", L"8", L"9"};
 
@@ -171,7 +191,7 @@ EFI_STATUS printDec(EFI_SYSTEM_TABLE* pSystemTable, uint64_t number)
     {
         unsigned index = checkNumber / denom;
 
-        status = pSystemTable->ConOut->OutputString(pSystemTable->ConOut, strings[index]);
+        status = g_pSystemTable->ConOut->OutputString(g_pSystemTable->ConOut, strings[index]);
         if (EFI_ERROR(status))
             return status;
 

@@ -5,6 +5,4 @@ build
 util/util-font-gen/build
 
 tests/KernelStringH/build
-tests/PhysMemManagement/build
-tests/PhysMemManagement/.vscode
 
