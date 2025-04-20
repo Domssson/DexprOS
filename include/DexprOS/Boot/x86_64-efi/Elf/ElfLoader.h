@@ -4,6 +4,8 @@
 #include "ElfHeaders.h"
 #include "../FileSystems/BinaryStream.h"
 
+#include <efi.h>
+
 
 #ifdef __cplusplus
 extern "C"
@@ -12,7 +14,8 @@ extern "C"
 
 
 
-int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream);
+int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
+                          EFI_SYSTEM_TABLE* pSystemTable);
 
 
 #ifdef __cplusplus

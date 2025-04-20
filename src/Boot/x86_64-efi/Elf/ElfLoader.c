@@ -3,8 +3,7 @@
 #include "DexprOS/Kernel/kstdlib/string.h"
 
 #include <stdbool.h>
-
-#include <efi.h>
+#include <stddef.h>
 
 
 EFI_STATUS print(const char* text);
@@ -163,7 +162,8 @@ bool MapElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pHeader)
 }
 
 
-int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream)
+int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
+                          EFI_SYSTEM_TABLE* pSystemTable)
 {
     DexprOSBoot_ElfHeader64 elfHeader;
 
@@ -173,21 +173,45 @@ int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream)
     if (!LoadElfHeader64(&elfHeader, pStream))
         return 2;
 
+        
+    int returnCode = 0;
+
+    UINTN programHeadersSize = sizeof(DexprOSBoot_ElfProgramHeader64) * elfHeader.e_phnum;
+    VOID* programHeadersBuffer = NULL;
+    EFI_STATUS status;
+    status = pSystemTable->BootServices->AllocatePool(EfiLoaderData, programHeadersSize, &programHeadersBuffer);
+    if (status != EFI_SUCCESS)
+        return 3;
+
+    DexprOSBoot_ElfProgramHeader64* pProgramHeaders = (DexprOSBoot_ElfProgramHeader64*)programHeadersBuffer;
+
+
     for (unsigned i = 0; i < elfHeader.e_phnum; ++i)
     {
-        DexprOSBoot_ElfProgramHeader64 programHeader;
-
         uint64_t offset = elfHeader.e_phoff + i * elfHeader.e_phentsize;
 
-        if (!LoadElfProgramHeader64(&programHeader,
+        if (!LoadElfProgramHeader64(&pProgramHeaders[i],
                                     offset,
                                     pStream))
-            return 3;
+        {
+            returnCode = 4;
+            goto cleanup;
+        }
 
-        if (!MapElfProgramHeader64(&programHeader))
-            return 4;
+        if (!MapElfProgramHeader64(&pProgramHeaders[i]))
+        {
+            returnCode = 5;
+            goto cleanup;
+        }
     }
 
-    return 0;
+    
+
+cleanup:
+
+    status = pSystemTable->BootServices->FreePool(programHeadersBuffer);
+    if (status != EFI_SUCCESS && returnCode == 0)
+        return 3;
+    return returnCode;
 }
 

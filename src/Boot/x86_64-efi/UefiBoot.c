@@ -90,7 +90,7 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
                                                                                  DexprOSBoot_KernelExecStart,
                                                                                  DexprOSBoot_KernelExecEnd);
 
-    int elfSuccess = DexprOSBoot_LoadElf64(&kernelStream);
+    int elfSuccess = DexprOSBoot_LoadElf64(&kernelStream, pSystemTable);
     if (elfSuccess == 0)
     {
         status = print("ELF loaded!\n");
