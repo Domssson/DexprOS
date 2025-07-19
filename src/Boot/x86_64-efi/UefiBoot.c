@@ -115,13 +115,7 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
         
 
 
-        for (unsigned i = 0; i < loadedExec.numSegments; i++)
-        {
-            if (loadedExec.pSegments[i].numPages > 0)
-                status = pSystemTable->BootServices->FreePages(loadedExec.pSegments[i].physicalAddress,
-                                                               loadedExec.pSegments[i].numPages);
-        }
-        status = pSystemTable->BootServices->FreePool(loadedExec.pSegments);
+        DexprOSBoot_FreeLoadedElfMemory(pSystemTable, &loadedExec);
     }
 
 

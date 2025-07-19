@@ -301,3 +301,22 @@ cleanup:
     return returnCode;
 }
 
+
+void DexprOSBoot_FreeLoadedElfMemory(EFI_SYSTEM_TABLE* pSystemTable,
+                                     DexprOSBoot_LoadedElf* pLoadedElf)
+{
+    if (pLoadedElf->pSegments == NULL)
+        return;
+
+    for (size_t i = 0; i < pLoadedElf->numSegments; i++)
+    {
+        if (pLoadedElf->pSegments[i].numPages > 0)
+            pSystemTable->BootServices->FreePages(pLoadedElf->pSegments[i].physicalAddress,
+                                                  pLoadedElf->pSegments[i].numPages);
+    }
+    pSystemTable->BootServices->FreePool(pLoadedElf->pSegments);
+
+    pLoadedElf->pSegments = NULL;
+    pLoadedElf->numSegments = 0;
+}
+

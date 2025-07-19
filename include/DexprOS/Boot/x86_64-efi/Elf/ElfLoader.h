@@ -48,9 +48,14 @@ typedef struct DexprOSBoot_LoadedElf
 } DexprOSBoot_LoadedElf;
 
 
+
 int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
                           EFI_SYSTEM_TABLE* pSystemTable,
                           DexprOSBoot_LoadedElf* pOutLoadedElf);
+
+
+void DexprOSBoot_FreeLoadedElfMemory(EFI_SYSTEM_TABLE* pSystemTable,
+                                     DexprOSBoot_LoadedElf* pLoadedElf);
 
 
 #ifdef __cplusplus
