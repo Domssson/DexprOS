@@ -6,13 +6,6 @@
 #include <stddef.h>
 
 
-EFI_STATUS print(const char* text);
-
-EFI_STATUS printHex(uint64_t number);
-
-EFI_STATUS printDec(uint64_t number);
-
-
 
 static bool VerifyIdentElf64LE(DexprOSBoot_ElfHeader64* pHeader)
 {
@@ -122,7 +115,7 @@ static bool VerifyElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pHeader)
     return false;
 }
 
-bool LoadElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pOut,
+static bool LoadElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pOut,
                             uint64_t offset,
                             DexprOSBoot_BinaryStream* pStream)
 {
@@ -149,21 +142,37 @@ bool LoadElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pOut,
 }
 
 
-bool MapElfProgramHeader64(DexprOSBoot_ElfProgramHeader64* pHeader)
+static DexprOSBoot_ElfSegmentType ElfProgramSegmentToDexprOSBootSegmentType(uint32_t segmentType)
 {
-    print("ELF program header:\n");
-    print("Type: ");
-    printHex(pHeader->p_type);
-    print("\nFlags: ");
-    printHex(pHeader->p_flags);
-    print("\n\n");
-
-    return true;
+    switch (segmentType)
+    {
+    case DEXPROSBOOT_ELF_PT_NULL:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_NULL;
+    case DEXPROSBOOT_ELF_PT_LOAD:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_LOAD;
+    case DEXPROSBOOT_ELF_PT_DYNAMIC:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_DYNAMIC;
+    case DEXPROSBOOT_ELF_PT_INTERP:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_INTERP;
+    case DEXPROSBOOT_ELF_PT_NOTE:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_NOTE;
+    case DEXPROSBOOT_ELF_PT_SHLIB:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_SHLIB;
+    case DEXPROSBOOT_ELF_PT_PHDR:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_PHDR;
+    case DEXPROSBOOT_ELF_PT_TLS:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_TLS;
+    default:
+        return DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_UNKNOWN;
+    }
 }
 
 
+
+
 int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
-                          EFI_SYSTEM_TABLE* pSystemTable)
+                          EFI_SYSTEM_TABLE* pSystemTable,
+                          DexprOSBoot_LoadedElf* pOutLoadedElf)
 {
     DexprOSBoot_ElfHeader64 elfHeader;
 
@@ -173,20 +182,41 @@ int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
     if (!LoadElfHeader64(&elfHeader, pStream))
         return 2;
 
+    
         
     int returnCode = 0;
 
+    DexprOSBoot_ElfProgramHeader64* pProgramHeaders = NULL;
+    DexprOSBoot_LoadedElfSegment* pSegments = NULL;
+
+    EFI_STATUS status = EFI_SUCCESS;
+    VOID* allocBuffer = NULL;
+
+
+
     UINTN programHeadersSize = sizeof(DexprOSBoot_ElfProgramHeader64) * elfHeader.e_phnum;
-    VOID* programHeadersBuffer = NULL;
-    EFI_STATUS status;
-    status = pSystemTable->BootServices->AllocatePool(EfiLoaderData, programHeadersSize, &programHeadersBuffer);
+    status = pSystemTable->BootServices->AllocatePool(EfiLoaderData, programHeadersSize, &allocBuffer);
     if (status != EFI_SUCCESS)
         return 3;
 
-    DexprOSBoot_ElfProgramHeader64* pProgramHeaders = (DexprOSBoot_ElfProgramHeader64*)programHeadersBuffer;
+    pProgramHeaders = (DexprOSBoot_ElfProgramHeader64*)allocBuffer;
 
 
-    for (unsigned i = 0; i < elfHeader.e_phnum; ++i)
+
+    status = pSystemTable->BootServices->AllocatePool(EfiLoaderData, sizeof(DexprOSBoot_LoadedElfSegment) * elfHeader.e_phnum, &allocBuffer);
+    if (status != EFI_SUCCESS)
+    {
+        returnCode = 3;
+        goto cleanup;
+    }
+    pSegments = (DexprOSBoot_LoadedElfSegment*)allocBuffer;
+    memset(pSegments, 0, sizeof(DexprOSBoot_LoadedElfSegment) * elfHeader.e_phnum);
+
+
+    
+
+
+    for (unsigned i = 0; i < elfHeader.e_phnum; i++)
     {
         uint64_t offset = elfHeader.e_phoff + i * elfHeader.e_phentsize;
 
@@ -198,20 +228,76 @@ int DexprOSBoot_LoadElf64(DexprOSBoot_BinaryStream* pStream,
             goto cleanup;
         }
 
-        if (!MapElfProgramHeader64(&pProgramHeaders[i]))
+
+        pSegments[i].segmentType = ElfProgramSegmentToDexprOSBootSegmentType(pProgramHeaders[i].p_type);
+        pSegments[i].flags = pProgramHeaders[i].p_flags;
+
+
+        if (pProgramHeaders[i].p_type != DEXPROSBOOT_ELF_PT_LOAD ||
+            pProgramHeaders[i].p_memsz == 0)
         {
-            returnCode = 5;
+            pSegments[i].physicalAddress = 0;
+            pSegments[i].preferredVirtualAddress = 0;
+            pSegments[i].numPages = 0;
+            continue;
+        }
+
+
+        EFI_PHYSICAL_ADDRESS address = 0;
+        UINTN numPages = (pProgramHeaders[i].p_memsz + EFI_PAGE_SIZE - 1) / EFI_PAGE_SIZE;
+        status = pSystemTable->BootServices->AllocatePages(AllocateAnyPages,
+                                                            EfiLoaderData,
+                                                            numPages,
+                                                            &address);
+        if (status != EFI_SUCCESS)
+        {
+            returnCode = 3;
             goto cleanup;
         }
+
+
+        memset((void*)address, 0, numPages * EFI_PAGE_SIZE);
+
+        if (pProgramHeaders[i].p_filesz > 0)
+        {
+            pStream->setStreamPos(pStream, pProgramHeaders[i].p_offset);
+            pStream->read(pStream, (void*)address, 1, pProgramHeaders[i].p_filesz);
+        }
+
+
+        pSegments[i].physicalAddress = address;
+        pSegments[i].preferredVirtualAddress = pProgramHeaders[i].p_vaddr;
+        pSegments[i].numPages = numPages;
     }
 
-    
+
+    pOutLoadedElf->pSegments = pSegments;
+    pOutLoadedElf->numSegments = elfHeader.e_phnum;
+    pOutLoadedElf->entryPointVirtAddress = elfHeader.e_entry;
+
 
 cleanup:
 
-    status = pSystemTable->BootServices->FreePool(programHeadersBuffer);
-    if (status != EFI_SUCCESS && returnCode == 0)
-        return 3;
+    if (returnCode != 0)
+    {
+        if (pSegments != NULL)
+        {
+            for (unsigned i = 0; i < elfHeader.e_phnum; i++)
+            {
+                if (pSegments[i].numPages > 0)
+                {
+                    status = pSystemTable->BootServices->FreePages(pSegments[i].physicalAddress,
+                                                                   pSegments[i].numPages);
+                }
+            }
+        }
+
+        if (pSegments != NULL)
+            status = pSystemTable->BootServices->FreePool(pSegments);
+    }
+
+    status = pSystemTable->BootServices->FreePool(pProgramHeaders);
+
     return returnCode;
 }
 

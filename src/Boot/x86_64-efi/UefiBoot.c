@@ -90,12 +90,38 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
                                                                                  DexprOSBoot_KernelExecStart,
                                                                                  DexprOSBoot_KernelExecEnd);
 
-    int elfSuccess = DexprOSBoot_LoadElf64(&kernelStream, pSystemTable);
+
+    DexprOSBoot_LoadedElf loadedExec;
+
+    int elfSuccess = DexprOSBoot_LoadElf64(&kernelStream, pSystemTable, &loadedExec);
     if (elfSuccess == 0)
     {
-        status = print("ELF loaded!\n");
+        status = print("\nELF loaded!\n\n");
         if (EFI_ERROR(status))
             return status;
+
+        for (unsigned i = 0; i < loadedExec.numSegments; ++i)
+        {
+            if (loadedExec.pSegments[i].segmentType != DEXPROSBOOT_ELF_SEGMENT_TYPE_PROGRAM_LOAD)
+                continue;
+
+            print("ELF program header:\n");
+            print("Type: ");
+            printHex(loadedExec.pSegments[i].segmentType);
+            print("\nFlags: ");
+            printHex(loadedExec.pSegments[i].flags);
+            print("\n\n");
+        }
+        
+
+
+        for (unsigned i = 0; i < loadedExec.numSegments; i++)
+        {
+            if (loadedExec.pSegments[i].numPages > 0)
+                status = pSystemTable->BootServices->FreePages(loadedExec.pSegments[i].physicalAddress,
+                                                               loadedExec.pSegments[i].numPages);
+        }
+        status = pSystemTable->BootServices->FreePool(loadedExec.pSegments);
     }
 
 
@@ -107,6 +133,8 @@ EFI_STATUS efi_main(EFI_HANDLE imageHandle, EFI_SYSTEM_TABLE* pSystemTable)
     while ((status = pSystemTable->ConIn->ReadKeyStroke(pSystemTable->ConIn, &key)) == EFI_NOT_READY);
 
     (void)imageHandle;
+
+    pSystemTable->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 1, L"");
 
     return status;
 }

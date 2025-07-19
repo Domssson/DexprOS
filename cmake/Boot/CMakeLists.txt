@@ -29,14 +29,14 @@ set(DEXPROS_SRC_DIR "${DEXPROS_BASE_DIR}/src")
 set(DEXPROS_INCLUDE_DIR "${DEXPROS_BASE_DIR}/include")
 
 
-set(DEXPROS_KERNEL_SOURCES ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/UefiBoot.c
+set(DEXPROS_BOOT_SOURCES ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/UefiBoot.c
                            ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/EmbeddedKernel.S
                            ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/FileSystems/BinaryStream.c
                            ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/Elf/ElfHeaders.c
                            ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/Elf/ElfLoader.c
                            ${DEXPROS_SRC_DIR}/Kernel/kstdlib/string.c)
 
-set(DEXPROS_KERNEL_HEADERS ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/EmbeddedKernel.h
+set(DEXPROS_BOOT_HEADERS ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/EmbeddedKernel.h
                            ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/FileSystems/BinaryStream.h
                            ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/Elf/ElfHeaders.h
                            ${DEXPROS_INCLUDE_DIR}/DexprOS/Boot/x86_64-efi/Elf/ElfLoader.h
@@ -47,7 +47,7 @@ set_property(SOURCE ${DEXPROS_SRC_DIR}/Boot/x86_64-efi/EmbeddedKernel.S
              APPEND PROPERTY OBJECT_DEPENDS ${DEXPROS_BASE_DIR}/build/Kernel/KERNEL)
 
 
-add_executable(BOOTX64.EFI ${DEXPROS_KERNEL_SOURCES} ${DEXPROS_KERNEL_HEADERS})
+add_executable(BOOTX64.EFI ${DEXPROS_BOOT_SOURCES} ${DEXPROS_BOOT_HEADERS})
 
 
 
